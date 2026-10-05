@@ -50,6 +50,8 @@ input {
   border-radius: 4px;
   font: 13px "Segoe UI", system-ui, sans-serif;
 }
+input[type="checkbox"] { display: inline-block; width: auto; margin: 0 6px 0 0; vertical-align: middle; }
+label.check { color: #e6e6e6; font-size: 13px; }
 .row { display: flex; gap: 8px; }
 .row label { flex: 1; }
 #report-list li.warn { color: #ffb86b; }

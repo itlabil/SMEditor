@@ -290,8 +290,117 @@
         addReport('Segmen ' + s.nomor + ' dilewati: ' + s.alasan, true);
       });
       addReport('Info teknis: titik=' + d.methodPoint + ', taruh=' + d.methodPlace + '.');
+      if ($('make-srt').checked) { writeSubtitle(d.clips || []); }
     });
   }
+
+  // ---------- Subtitle dari narasi ----------
+
+  var WORDS_PER_SECOND = 2.3; // perkiraan kecepatan membaca narasi
+  var MAX_CUE_CHARS = 60;
+
+  function srtTime(sec) {
+    var ms = Math.max(0, Math.round(sec * 1000));
+    var h = Math.floor(ms / 3600000); ms -= h * 3600000;
+    var m = Math.floor(ms / 60000); ms -= m * 60000;
+    var s = Math.floor(ms / 1000); ms -= s * 1000;
+    function pad(n, width) { n = String(n); while (n.length < width) { n = '0' + n; } return n; }
+    return pad(h, 2) + ':' + pad(m, 2) + ':' + pad(s, 2) + ',' + pad(ms, 3);
+  }
+
+  // Memecah narasi menjadi baris pendek; akhir kalimat diutamakan sebagai batas.
+  function splitCues(text) {
+    var words = text.replace(/\s+/g, ' ').trim().split(' ');
+    var cues = [];
+    var current = '';
+    words.forEach(function (w) {
+      if (!w) { return; }
+      if (current && current.length + 1 + w.length > MAX_CUE_CHARS) {
+        cues.push(current);
+        current = w;
+      } else {
+        current = current ? current + ' ' + w : w;
+      }
+      if (/[.!?]$/.test(w) && current.length > MAX_CUE_CHARS / 2) {
+        cues.push(current);
+        current = '';
+      }
+    });
+    if (current) { cues.push(current); }
+    return cues;
+  }
+
+  function buildSrt(clips) {
+    var byNomor = {};
+    state.valid.forEach(function (s) { byNomor[s.nomor] = s; });
+
+    var lines = [];
+    var count = 0;
+    clips.forEach(function (clip) {
+      var seg = byNomor[clip.nomor];
+      if (!seg || !seg.narasi) { return; }
+
+      var wordCount = seg.narasi.trim().split(/\s+/).length;
+      var lead = Math.min(0.5, clip.length / 4);
+      var speak = Math.min(clip.length - lead - 0.2, wordCount / WORDS_PER_SECOND);
+      if (speak <= 0) { return; }
+
+      var cues = splitCues(seg.narasi);
+      var totalChars = 0;
+      cues.forEach(function (c) { totalChars += c.length; });
+      if (!totalChars) { return; }
+
+      var t = clip.start + lead;
+      cues.forEach(function (text) {
+        var dur = speak * (text.length / totalChars);
+        count++;
+        lines.push(String(count), srtTime(t) + ' --> ' + srtTime(t + dur), text, '');
+        t += dur;
+      });
+    });
+    return { text: lines.join('\r\n'), count: count };
+  }
+
+  function writeSubtitle(clips) {
+    var srt = buildSrt(clips);
+    if (!srt.count) { addReport('Subtitle tidak dibuat: tidak ada narasi.', true); return; }
+
+    var path = joinPath(dirName(state.jsonPath), 'subtitle.srt');
+    var res = window.cep.fs.writeFile(path, srt.text);
+    if (res.err !== window.cep.fs.NO_ERROR) {
+      addReport('subtitle.srt gagal ditulis (kode ' + res.err + ').', true);
+      return;
+    }
+    addReport('subtitle.srt dibuat: ' + srt.count + ' baris, di ' + path);
+
+    evalHost('smeImportFile(' + toLiteral(path) + ')').then(function (r) {
+      if (r.ok && r.data.imported) {
+        addReport('Subtitle diimpor ke panel Project. Seret ke timeline tepat di 00:00.');
+      } else {
+        addReport('Subtitle tidak bisa diimpor otomatis' + (r.ok ? '' : ' (' + r.error + ')') +
+          '. Impor manual lewat File > Import.', true);
+      }
+    });
+  }
+
+  // ---------- Ingat nilai terakhir ----------
+
+  function remember(id, isCheck) {
+    var el = $(id);
+    var key = 'sme.' + id;
+    try {
+      var saved = window.localStorage.getItem(key);
+      if (saved !== null) {
+        if (isCheck) { el.checked = saved === '1'; } else { el.value = saved; }
+      }
+      el.addEventListener('change', function () {
+        window.localStorage.setItem(key, isCheck ? (el.checked ? '1' : '0') : el.value);
+      });
+    } catch (e) { /* tanpa penyimpanan, pakai nilai bawaan */ }
+  }
+  remember('pad', false);
+  remember('gap', false);
+  remember('make-srt', true);
 
   $('btn-build').addEventListener('click', buildSequence);
 

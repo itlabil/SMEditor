@@ -188,6 +188,7 @@ function smeBuild(params) {
         var markers = 0;
         var markerError = '';
         var skipped = [];
+        var clips = [];
         var colors = {};
         var colorCount = 0;
         var methodPoint = '';
@@ -217,6 +218,7 @@ function smeBuild(params) {
             }
             methodPlace = placed;
             created++;
+            clips.push('{"nomor":' + seg.nomor + ',"start":' + position + ',"length":' + length + '}');
 
             try {
                 if (colors[seg.kategori] === undefined) {
@@ -249,6 +251,7 @@ function smeBuild(params) {
             '"totalSeconds":' + (position > gap ? position - gap : position) + ',' +
             '"methodPoint":"' + smeEscape(methodPoint) + '",' +
             '"methodPlace":"' + smeEscape(methodPlace) + '",' +
+            '"clips":[' + clips.join(',') + '],' +
             '"skipped":[' + skipped.join(',') + ']' +
             '}}';
     } catch (e) {
@@ -259,5 +262,21 @@ function smeBuild(params) {
             try { item.clearInPoint(); } catch (eIn) { /* biarkan */ }
             try { item.clearOutPoint(); } catch (eOut) { /* biarkan */ }
         }
+    }
+}
+
+// ---------- Tahap 3: subtitle ----------
+
+// Mengimpor satu file (misalnya subtitle.srt) ke panel Project.
+function smeImportFile(path) {
+    try {
+        if (!app.project || !app.project.rootItem) {
+            return smeFail('Belum ada project Premiere yang terbuka.');
+        }
+        var nativePath = new File(path).fsName;
+        var ok = app.project.importFiles([nativePath], true, app.project.rootItem, false);
+        return '{"ok":true,"data":{"imported":' + (ok ? 'true' : 'false') + '}}';
+    } catch (e) {
+        return smeFail(e.toString());
     }
 }
