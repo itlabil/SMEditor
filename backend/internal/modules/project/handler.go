@@ -128,9 +128,10 @@ func (h *Handler) prompt(c *gin.Context) {
 }
 
 func (h *Handler) openFolder(c *gin.Context) {
-	if err := h.svc.OpenFolder(c.Request.Context(), c.Param("id")); err != nil {
+	path, err := h.svc.OpenFolder(c.Request.Context(), c.Param("id"))
+	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	httpx.NoContent(c)
+	httpx.OK(c, gin.H{"path": path})
 }

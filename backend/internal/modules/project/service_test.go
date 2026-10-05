@@ -477,7 +477,8 @@ func TestServiceOpenFolder_OpensTheProjectDir(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	if err := svc.OpenFolder(context.Background(), p.ID); err != nil {
+	gotPath, err := svc.OpenFolder(context.Background(), p.ID)
+	if err != nil {
 		t.Fatalf("OpenFolder: %v", err)
 	}
 	wantDir, err := st.ProjectDir(p.ID)
@@ -487,17 +488,59 @@ func TestServiceOpenFolder_OpensTheProjectDir(t *testing.T) {
 	if opener.openedPath != wantDir {
 		t.Errorf("opened path = %q, want %q", opener.openedPath, wantDir)
 	}
+	if gotPath != wantDir {
+		t.Errorf("OpenFolder returned path = %q, want %q", gotPath, wantDir)
+	}
 }
 
 func TestServiceOpenFolder_NotFound(t *testing.T) {
 	svc := newTestService(t)
 
-	err := svc.OpenFolder(context.Background(), "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	_, err := svc.OpenFolder(context.Background(), "01ARZ3NDEKTSV4RRFFQ69G5FAV")
 	if err == nil {
 		t.Fatal("OpenFolder with unknown id: want error, got nil")
 	}
 	if code := appErrCode(t, err); code != "project_not_found" {
 		t.Errorf("code = %q, want project_not_found", code)
+	}
+}
+
+// A failing opener (command exists but fails, e.g. no file manager
+// registered) must not be reported as success, and the folder's absolute
+// path must still reach the caller so the UI can show it for manual
+// copying, per docs/sequence.md ("POST /api/projects/:id/open-folder").
+func TestServiceOpenFolder_OpenerFailureReturnsErrorAndPath(t *testing.T) {
+	conn, err := db.Open(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	if err := db.Migrate(context.Background(), conn); err != nil {
+		t.Fatalf("db.Migrate: %v", err)
+	}
+	repo := NewRepository(conn)
+	st := storage.New(t.TempDir())
+	opener := &fakeFolderOpener{err: errors.New("xdg-open: exit status 3")}
+	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{}, opener)
+
+	p, err := svc.Create(context.Background(), validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	gotPath, err := svc.OpenFolder(context.Background(), p.ID)
+	if err == nil {
+		t.Fatal("OpenFolder with failing opener: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "open_folder_failed" {
+		t.Errorf("code = %q, want open_folder_failed", code)
+	}
+	wantDir, err := st.ProjectDir(p.ID)
+	if err != nil {
+		t.Fatalf("ProjectDir: %v", err)
+	}
+	if gotPath != wantDir {
+		t.Errorf("OpenFolder returned path = %q, want %q", gotPath, wantDir)
 	}
 }
 

@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -64,16 +65,23 @@ func NewService(repo *Repository, st *storage.Storage, jobs Jobs, promptAssemble
 
 // OpenFolder opens a project's data folder in the OS's file manager, so
 // the user can copy the source video and highlight.json into Premiere's
-// project folder.
-func (s *Service) OpenFolder(ctx context.Context, id string) error {
+// project folder. It always returns the folder's absolute path, even when
+// the open itself fails, so the caller can still show it to the user to
+// copy by hand.
+func (s *Service) OpenFolder(ctx context.Context, id string) (string, error) {
 	if _, err := s.findByID(ctx, id); err != nil {
-		return err
+		return "", err
 	}
 	dir, err := s.storage.ProjectDir(id)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return s.opener.OpenFolder(ctx, dir)
+	if err := s.opener.OpenFolder(ctx, dir); err != nil {
+		appErr := httpx.ErrConflict("open_folder_failed", fmt.Sprintf("Gagal membuka folder project: %v", err))
+		appErr.Details = map[string]string{"path": dir}
+		return dir, appErr
+	}
+	return dir, nil
 }
 
 // SetHighlightSaved marks a project siap_premiere with has_highlight=1,

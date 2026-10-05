@@ -25,6 +25,7 @@ const transcriptLang = ref('auto')
 const job = ref(null)
 const promptText = ref('')
 const openingFolder = ref(false)
+const folderPath = ref('')
 
 const highlightBody = ref('')
 const highlightErrors = ref([])
@@ -116,11 +117,28 @@ async function removeHighlight() {
 async function openProjectFolder() {
   openingFolder.value = true
   try {
-    await openFolder(route.params.id)
+    const res = await openFolder(route.params.id)
+    folderPath.value = res.path
+    success('Folder project dibuka')
   } catch (err) {
+    // Even when the file manager itself failed to launch, the backend
+    // still reports the absolute path (err.details.path) so the user can
+    // copy it and open it by hand.
+    if (err.details?.path) {
+      folderPath.value = err.details.path
+    }
     error(err.message)
   } finally {
     openingFolder.value = false
+  }
+}
+
+async function copyFolderPath() {
+  try {
+    await navigator.clipboard.writeText(folderPath.value)
+    success('Path disalin')
+  } catch (err) {
+    error('Gagal menyalin path')
   }
 }
 
@@ -258,6 +276,10 @@ onUnmounted(() => sse.close())
         >
           Buka folder project
         </button>
+      </div>
+      <div v-if="folderPath" class="flex items-center gap-2 rounded bg-slate-900 px-3 py-2 text-xs">
+        <code class="flex-1 overflow-x-auto whitespace-nowrap text-slate-300">{{ folderPath }}</code>
+        <button class="shrink-0 rounded bg-slate-800 px-2 py-1 font-medium" @click="copyFolderPath">Salin</button>
       </div>
       <dl class="grid grid-cols-2 gap-2 text-sm">
         <dt class="text-slate-400">Game</dt>

@@ -93,6 +93,7 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `transcript_missing` | 409 | Transcript belum ada |
 | `highlight_invalid` | 422 | JSON highlight melanggar aturan |
 | `tool_not_found` | 409 | yt-dlp, ffmpeg, atau Whisper tidak ditemukan |
+| `open_folder_failed` | 409 | File manager gagal dijalankan untuk membuka folder project (`details.path` tetap berisi path absolut) |
 | `thumbnail_not_found` | 404 | Thumbnail project belum tersedia |
 | `video_not_found` | 404 | Video project belum tersedia |
 | `invalid_format` | 400 | Parameter `format` bukan `txt` atau `json` |
