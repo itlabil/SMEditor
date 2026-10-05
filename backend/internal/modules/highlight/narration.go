@@ -20,12 +20,18 @@ func TotalDuration(segmen []Segment) float64 {
 	return total
 }
 
-// buildNarasi renders narasi.txt: one block per segment, in order, with
-// its time range and label as a heading and the dubbing script below,
-// per docs/prd.md ("Script narasi dibuat dari JSON yang sama ... berurutan
-// per segmen").
-func buildNarasi(segmen []Segment) string {
+// buildNarasi renders narasi.txt: the draft result first when there is
+// one (SM-16), then one block per segment, in order, with its time range
+// and label as a heading and the dubbing script below, per docs/prd.md
+// ("Script narasi dibuat dari JSON yang sama ... berurutan per segmen").
+func buildNarasi(draft *Draft, segmen []Segment) string {
 	var b strings.Builder
+	if draft != nil {
+		b.WriteString("HASIL DRAFT\n")
+		writeTeamDraft(&b, draft.TimA, "Tim A")
+		writeTeamDraft(&b, draft.TimB, "Tim B")
+		b.WriteString("\n")
+	}
 	for _, s := range segmen {
 		b.WriteString("[")
 		b.WriteString(s.Mulai)
@@ -38,4 +44,24 @@ func buildNarasi(segmen []Segment) string {
 		b.WriteString("\n\n")
 	}
 	return b.String()
+}
+
+func writeTeamDraft(b *strings.Builder, t TeamDraft, fallbackName string) {
+	name := t.Nama
+	if name == "" {
+		name = fallbackName
+	}
+	b.WriteString(name)
+	b.WriteString("\n  Pick: ")
+	b.WriteString(joinOrDash(t.Pick))
+	b.WriteString("\n  Ban: ")
+	b.WriteString(joinOrDash(t.Ban))
+	b.WriteString("\n")
+}
+
+func joinOrDash(names []string) string {
+	if len(names) == 0 {
+		return "-"
+	}
+	return strings.Join(names, ", ")
 }

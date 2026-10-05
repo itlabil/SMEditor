@@ -1,11 +1,12 @@
 package prompt
 
 // defaultBlock is what "reset to default" restores a block to. The text
-// here must mirror backend/internal/db/migrations/0002_seed_prompt_blocks.sql
-// exactly: migrations that have already been committed are never edited
-// (per .agents/skills/sm-database), so once a user customizes a block the
-// original seed text is no longer recoverable from the database itself,
-// and lives here instead.
+// here must mirror the latest seed of each block exactly:
+// backend/internal/db/migrations/0002_seed_prompt_blocks.sql, with the moba
+// block superseded by 0005_moba_draft_prompt.sql (SM-16). Committed
+// migrations are never edited (per .agents/skills/sm-database), so once a
+// user customizes a block the original seed text is no longer recoverable
+// from the database itself, and lives here instead.
 type defaultBlock struct {
 	Body       string
 	Categories []string
@@ -77,8 +78,19 @@ Jumlah momen untuk fase early, mid, dan end, masing-masing:
 
 Durasi segmen 15-90 detik. Segmen draft boleh sampai 120 detik.
 
+Hasil draft:
+Tambahkan field "draft" di JSON jawaban, sejajar dengan "ringkasan" dan "segmen", dengan struktur:
+"draft": {
+  "tim_a": {"nama": "nama tim pertama", "pick": ["hero pick pertama", "hero pick kedua"], "ban": ["hero yang di-ban"]},
+  "tim_b": {"nama": "nama tim kedua", "pick": ["hero pick pertama"], "ban": []}
+}
+- Isi dari transcript. Tulis "pick" sesuai urutan pick tim itu, maksimal 5 hero per tim. "ban" boleh kosong.
+- Tulis nama hero dengan ejaan resmi di game. Jika transcript salah dengar nama hero, perbaiki hanya jika jelas hero mana yang dimaksud.
+- Jangan mengarang hero yang tidak disebut caster. Isi hanya yang ada; daftar boleh kurang dari 5 atau kosong.
+- Jika caster sama sekali tidak membahas draft, hilangkan field "draft".
+
 Narasi khusus:
-- draft: sebutkan karakter kunci tiap tim dan gambaran komposisinya.
+- draft: sebutkan dulu semua hero yang di-pick tiap tim, sama dengan isi field "draft", baru setelah itu komentari komposisinya.
 - kesimpulan: simpulkan mengapa tim pemenang bisa menang, lalu sebutkan {penghargaan} jika ada.`,
 		Categories: []string{"draft", "early", "mid", "end", "kesimpulan"},
 	},

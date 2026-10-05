@@ -24,3 +24,8 @@ export function updateSegment(id, nomor, segment) {
 export function deleteSegment(id, nomor) {
   return request('DELETE', `/projects/${id}/highlight/segmen/${nomor}`)
 }
+
+// draft: { tim_a: { nama, pick: [], ban: [] }, tim_b: { ... } }
+export function updateDraft(id, draft) {
+  return request('PUT', `/projects/${id}/highlight/draft`, draft)
+}

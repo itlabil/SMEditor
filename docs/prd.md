@@ -79,12 +79,13 @@ Status project di app web: `baru`, `mengunduh`, `transcript`, `menunggu highligh
 ### Validasi highlight
 
 - Kolom tempel menerima JSON dari AI, termasuk yang terbungkus blok kode.
-- Validasi: skema benar, `mulai` lebih kecil dari `selesai`, waktu tidak melewati durasi video, segmen tidak tumpang tindih.
+- Validasi: skema benar, `mulai` lebih kecil dari `selesai`, waktu tidak melewati durasi video, segmen tidak tumpang tindih, dan jika ada `draft`, pick tiap tim maksimal 5.
 - Kesalahan ditunjukkan per segmen supaya bisa diperbaiki atau diminta ulang ke AI.
 - Hasil yang lolos ditampilkan sebagai daftar segmen untuk dibaca, lalu disimpan sebagai `highlight.json`.
 - Tiap segmen pada daftar bisa diputar sebagai pratinjau dari video asli, dari waktu mulai sampai selesai; hanya pemutaran, tanpa fitur edit (potong, susun ulang, dan export tetap dilakukan di Premiere).
 - Tiap segmen pada daftar bisa diubah lewat tombol "Ubah" (label, narasi, kategori, waktu mulai, waktu selesai) atau dihapus dengan konfirmasi SweetAlert. Perubahan diperiksa dengan validasi yang sama seperti saat menempel JSON; jika lolos, `highlight.json` dan `narasi.txt` ditulis ulang, jika tidak, kesalahan tampil di form dan file tidak berubah.
-- Script narasi dibuat dari JSON yang sama dan disimpan sebagai `narasi.txt`, berurutan per segmen.
+- Jika highlight punya `draft`, kartu "Hasil draft" di atas daftar segmen menampilkan pick dan ban kedua tim, dan bisa diubah lewat tombol "Ubah" dengan validasi yang sama. Untuk genre MOBA kartu tetap tampil walau belum ada draft, supaya bisa diisi manual.
+- Script narasi dibuat dari JSON yang sama dan disimpan sebagai `narasi.txt`: hasil draft (jika ada) di bagian atas, lalu berurutan per segmen.
 - Tombol buka folder project memudahkan menyalin video dan file highlight ke Premiere.
 
 ### Salin ke folder
@@ -156,6 +157,20 @@ JSON highlight yang diminta dari AI dan diterima app:
 | `label` | Judul pendek, maksimal 8 kata |
 | `alasan` | Kutipan atau konteks dari transcript, untuk pengecekan |
 | `narasi` | Bahasa Indonesia, maksimal sekitar 2 kata per detik durasi segmen |
+| `draft` | Opsional, hanya diminta prompt MOBA. Jika ada, `pick` tiap tim maksimal 5 hero (urutan pick) dan `ban` boleh kosong |
+
+Untuk genre MOBA, JSON boleh berisi field `draft` di tingkat atas, sejajar dengan `segmen`:
+
+```json
+{
+  "draft": {
+    "tim_a": { "nama": "ONIC", "pick": ["Fanny", "Kaja"], "ban": ["Ling"] },
+    "tim_b": { "nama": "RRQ", "pick": ["Lancelot"], "ban": [] }
+  }
+}
+```
+
+Nama hero ditulis dengan ejaan resmi game; hero yang tidak disebut caster tidak diisi. Plugin Premiere hanya membaca `segmen`, jadi `draft` tidak memengaruhinya.
 
 File `highlight.json` yang disimpan app web memakai struktur yang sama, ditambah `video` (nama file video asli) dan `durasi` (detik), supaya plugin bisa mencocokkan file dan memeriksa batas waktu.
 
@@ -216,6 +231,8 @@ Balas HANYA dengan JSON valid, tanpa teks lain, dengan struktur:
 
 Dipakai untuk Mobile Legends, Honor of Kings, Arena of Valor, Wild Rift, League of Legends, dan Dota 2. Kategori: `draft`, `early`, `mid`, `end`, `kesimpulan`.
 
+Blok ini juga meminta field `draft` (hasil pick dan ban, lihat Format data). Teks di bawah adalah versi terbaru, dipasang lewat migrasi `0005_moba_draft_prompt.sql` hanya jika blok MOBA belum diubah pengguna (`is_custom = 0`); blok yang sudah diubah pengguna dibiarkan, dan "kembalikan ke bawaan" memakai teks ini.
+
 ```
 Istilah game ini:
 - Objektif: {objektif}
@@ -236,8 +253,19 @@ Jumlah momen untuk fase early, mid, dan end, masing-masing:
 
 Durasi segmen 15-90 detik. Segmen draft boleh sampai 120 detik.
 
+Hasil draft:
+Tambahkan field "draft" di JSON jawaban, sejajar dengan "ringkasan" dan "segmen", dengan struktur:
+"draft": {
+  "tim_a": {"nama": "nama tim pertama", "pick": ["hero pick pertama", "hero pick kedua"], "ban": ["hero yang di-ban"]},
+  "tim_b": {"nama": "nama tim kedua", "pick": ["hero pick pertama"], "ban": []}
+}
+- Isi dari transcript. Tulis "pick" sesuai urutan pick tim itu, maksimal 5 hero per tim. "ban" boleh kosong.
+- Tulis nama hero dengan ejaan resmi di game. Jika transcript salah dengar nama hero, perbaiki hanya jika jelas hero mana yang dimaksud.
+- Jangan mengarang hero yang tidak disebut caster. Isi hanya yang ada; daftar boleh kurang dari 5 atau kosong.
+- Jika caster sama sekali tidak membahas draft, hilangkan field "draft".
+
 Narasi khusus:
-- draft: sebutkan karakter kunci tiap tim dan gambaran komposisinya.
+- draft: sebutkan dulu semua hero yang di-pick tiap tim, sama dengan isi field "draft", baru setelah itu komentari komposisinya.
 - kesimpulan: simpulkan mengapa tim pemenang bisa menang, lalu sebutkan {penghargaan} jika ada.
 ```
 

@@ -20,6 +20,21 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	g.GET("/:id/narasi", h.narasi)
 	g.PUT("/:id/highlight/segmen/:nomor", h.updateSegment)
 	g.DELETE("/:id/highlight/segmen/:nomor", h.deleteSegment)
+	g.PUT("/:id/highlight/draft", h.updateDraft)
+}
+
+func (h *Handler) updateDraft(c *gin.Context) {
+	var req Draft
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Fail(c, httpx.ErrBadRequest("invalid_body", "Data yang dikirim tidak valid"))
+		return
+	}
+	saved, err := h.svc.UpdateDraft(c.Request.Context(), c.Param("id"), req)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, toResponse(saved))
 }
 
 // segmentNomor reads the 1-based :nomor path param. Anything that is not

@@ -23,6 +23,7 @@ Semua respons API berformat JSON: `{"data": ...}` saat berhasil, `{"error": {"co
 | DELETE | `/api/projects/:id/highlight` | Hapus highlight |
 | PUT | `/api/projects/:id/highlight/segmen/:nomor` | Ubah satu segmen (nomor mulai dari 1), validasi ulang, tulis ulang file |
 | DELETE | `/api/projects/:id/highlight/segmen/:nomor` | Hapus satu segmen, validasi ulang, tulis ulang file |
+| PUT | `/api/projects/:id/highlight/draft` | Ubah hasil draft (`tim_a`, `tim_b`), validasi ulang, tulis ulang file |
 | GET | `/api/projects/:id/narasi` | Unduh `narasi.txt` |
 | POST | `/api/projects/:id/open-folder` | Buka folder project di file manager |
 | POST | `/api/projects/:id/export` | Salin video, highlight.json, narasi.txt ke folder Premiere (job `export`) |
@@ -129,6 +130,8 @@ sequenceDiagram
 ```
 
 ## 3b. Ubah atau hapus segmen
+
+Ubah hasil draft (`PUT /api/projects/:id/highlight/draft` dengan body `{tim_a, tim_b}`) mengikuti alur yang sama dengan Ubah segmen, tanpa kemungkinan `segment_not_found`.
 
 ```mermaid
 sequenceDiagram

@@ -1,0 +1,4 @@
+# Migrations are embedded into the binary and seed prompt text into the
+# database; keep them LF on every OS so the seeded text matches the Go raw
+# strings in backend/internal/modules/prompt/defaults.go.
+backend/internal/db/migrations/*.sql text eol=lf

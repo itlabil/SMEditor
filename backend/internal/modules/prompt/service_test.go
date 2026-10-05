@@ -22,8 +22,8 @@ func newTestService(t *testing.T) *Service {
 }
 
 // TestDefaultBlocksMatchSeedMigration guards against defaults.go drifting
-// from backend/internal/db/migrations/0002_seed_prompt_blocks.sql, which
-// can never be edited once committed (per .agents/skills/sm-database) —
+// from the seeded blocks after every migration has run (0002 seeds them,
+// 0005 replaces the moba block), which can never be edited once committed (per .agents/skills/sm-database) —
 // if this test fails, defaults.go has a transcription error, not the
 // migration.
 func TestDefaultBlocksMatchSeedMigration(t *testing.T) {

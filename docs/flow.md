@@ -106,8 +106,9 @@ Hapus project tersedia di semua status.
    - `selesai` tidak melewati durasi video.
    - Segmen berurutan dan tidak tumpang tindih.
    - `kategori` termasuk daftar kategori genre project.
+   - `draft` opsional; jika ada, `pick` tiap tim maksimal 5 dan `ban` boleh kosong.
 3. Jika ada kesalahan, app menampilkan daftar kesalahan per segmen dan tidak menyimpan apa pun.
-4. Jika lolos, app menulis `highlight.json` (ditambah `video` dan `durasi`) dan `narasi.txt`, status project menjadi `siap_premiere`.
+4. Jika lolos, app menulis `highlight.json` (ditambah `video` dan `durasi`) dan `narasi.txt` (hasil draft di bagian atas jika ada, lalu per segmen), status project menjadi `siap_premiere`.
 
 ### 4.5b Ubah dan hapus segmen
 
@@ -116,6 +117,13 @@ Hapus project tersedia di semua status.
 3. Jika ada kesalahan, kesalahan tampil di form dan tidak ada file yang ditulis.
 4. Jika lolos, app menulis ulang `highlight.json` dan `narasi.txt`. Status project tetap `siap_premiere`.
 5. Hapus segmen meminta konfirmasi SweetAlert, lalu berjalan dengan langkah 2–4 yang sama. Segmen terakhir tidak bisa dihapus dengan cara ini (highlight tanpa segmen tidak lolos validasi); pakai "Hapus highlight".
+
+### 4.5c Hasil draft (MOBA)
+
+1. Prompt blok MOBA meminta AI mengisi field `draft`: nama tim, pick (urut, maksimal 5), dan ban kedua tim, hanya dari hero yang disebut caster.
+2. Di atas daftar highlight, kartu "Hasil draft" menampilkan pick dan ban kedua tim. Untuk genre MOBA kartu tetap tampil walau belum ada draft.
+3. Tombol "Ubah" membuka form nama tim, pick, dan ban (dipisah koma). Simpan memeriksa seluruh highlight dengan aturan 4.5; jika lolos, `highlight.json` dan `narasi.txt` ditulis ulang, jika tidak, kesalahan tampil di form dan file tidak berubah.
+4. Plugin Premiere hanya membaca `segmen`; `draft` diabaikan.
 
 ### 4.5a Salin ke folder
 

@@ -9,10 +9,25 @@ type Segment struct {
 	Narasi   string `json:"narasi"`
 }
 
+// TeamDraft is one team's draft result. Pick is in pick order.
+type TeamDraft struct {
+	Nama string   `json:"nama"`
+	Pick []string `json:"pick"`
+	Ban  []string `json:"ban"`
+}
+
+// Draft is the optional MOBA draft result (SM-16). The Premiere plugin
+// only reads "segmen", so this field never affects it.
+type Draft struct {
+	TimA TeamDraft `json:"tim_a"`
+	TimB TeamDraft `json:"tim_b"`
+}
+
 // Highlight is the JSON shape requested from the AI, per docs/prd.md.
 type Highlight struct {
 	Game      string    `json:"game"`
 	Ringkasan string    `json:"ringkasan"`
+	Draft     *Draft    `json:"draft,omitempty"`
 	Segmen    []Segment `json:"segmen"`
 }
 
@@ -32,6 +47,7 @@ type ValidationError struct {
 type SavedHighlight struct {
 	Game      string    `json:"game"`
 	Ringkasan string    `json:"ringkasan"`
+	Draft     *Draft    `json:"draft,omitempty"`
 	Segmen    []Segment `json:"segmen"`
 	Video     string    `json:"video"`
 	Durasi    float64   `json:"durasi"`
@@ -43,7 +59,7 @@ type SavedHighlight struct {
 func (s *SavedHighlight) toHighlight() *Highlight {
 	segmen := make([]Segment, len(s.Segmen))
 	copy(segmen, s.Segmen)
-	return &Highlight{Game: s.Game, Ringkasan: s.Ringkasan, Segmen: segmen}
+	return &Highlight{Game: s.Game, Ringkasan: s.Ringkasan, Draft: s.Draft, Segmen: segmen}
 }
 
 // SegmentInput is the edit form for one segment on the project page

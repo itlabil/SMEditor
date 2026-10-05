@@ -91,6 +91,7 @@ erDiagram
 
 - Baris `frame` adalah kerangka bersama; baris lain adalah blok tugas per genre.
 - Isi awal di-seed dari PRD saat migrasi pertama. Tombol "kembalikan ke bawaan" menulis ulang dari seed.
+- Perubahan teks bawaan dikirim lewat migrasi baru yang hanya memperbarui baris dengan `is_custom = 0` (misalnya `0005_moba_draft_prompt.sql` untuk field `draft` di blok `moba`), dan `defaults.go` diperbarui ke teks yang sama.
 
 ### game_modes
 

@@ -49,6 +49,7 @@ func Validate(h *Highlight, durationSec float64, validCategories []string) []Val
 	if strings.TrimSpace(h.Ringkasan) == "" {
 		errs = append(errs, ValidationError{Field: "ringkasan", Message: "Field ringkasan wajib diisi"})
 	}
+	errs = append(errs, validateDraft(h.Draft)...)
 	if len(h.Segmen) == 0 {
 		errs = append(errs, ValidationError{Field: "segmen", Message: "Tidak ada segmen"})
 		return errs
@@ -118,6 +119,30 @@ func Validate(h *Highlight, durationSec float64, validCategories []string) []Val
 		}
 	}
 
+	return errs
+}
+
+const maxDraftPicks = 5
+
+// validateDraft checks the optional "draft" field (SM-16): absent is
+// fine; if present, each team may have at most 5 picks, and an empty
+// ban list is allowed. Errors are document-level (Segmen 0).
+func validateDraft(d *Draft) []ValidationError {
+	if d == nil {
+		return nil
+	}
+	var errs []ValidationError
+	for _, team := range []struct {
+		key  string
+		data TeamDraft
+	}{{"tim_a", d.TimA}, {"tim_b", d.TimB}} {
+		if len(team.data.Pick) > maxDraftPicks {
+			errs = append(errs, ValidationError{
+				Field:   "draft." + team.key + ".pick",
+				Message: fmt.Sprintf("Pick maksimal %d hero, ada %d", maxDraftPicks, len(team.data.Pick)),
+			})
+		}
+	}
 	return errs
 }
 

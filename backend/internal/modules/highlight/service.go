@@ -100,6 +100,44 @@ func (s *Service) DeleteSegment(ctx context.Context, projectID string, nomor int
 	return s.validateAndWrite(ctx, p, h)
 }
 
+// UpdateDraft replaces the saved highlight's draft result (SM-16) and
+// rewrites both files after the same validation as Save.
+func (s *Service) UpdateDraft(ctx context.Context, projectID string, d Draft) (*SavedHighlight, error) {
+	p, err := s.projects.Get(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	saved, err := s.Get(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	h := saved.toHighlight()
+	h.Draft = &d
+	return s.validateAndWrite(ctx, p, h)
+}
+
+// normalizeDraft trims every name and drops blank hero entries, so a
+// trailing comma in the edit form or a stray "" from the AI never ends
+// up in highlight.json. Lists are never nil, so they serialize as [].
+func normalizeDraft(d *Draft) *Draft {
+	if d == nil {
+		return nil
+	}
+	clean := func(names []string) []string {
+		out := []string{}
+		for _, n := range names {
+			if n = strings.TrimSpace(n); n != "" {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	team := func(t TeamDraft) TeamDraft {
+		return TeamDraft{Nama: strings.TrimSpace(t.Nama), Pick: clean(t.Pick), Ban: clean(t.Ban)}
+	}
+	return &Draft{TimA: team(d.TimA), TimB: team(d.TimB)}
+}
+
 // loadForEdit reads the project and its saved highlight and checks that
 // segment nomor exists.
 func (s *Service) loadForEdit(ctx context.Context, projectID string, nomor int) (*project.Project, *Highlight, error) {
@@ -121,6 +159,7 @@ func (s *Service) loadForEdit(ctx context.Context, projectID string, nomor int) 
 // and video duration and, only if there are no errors, writes
 // highlight.json and narasi.txt.
 func (s *Service) validateAndWrite(ctx context.Context, p *project.Project, h *Highlight) (*SavedHighlight, error) {
+	h.Draft = normalizeDraft(h.Draft)
 	categories, err := s.categories.CategoriesForGame(ctx, p.GameCode)
 	if err != nil {
 		return nil, err
@@ -134,7 +173,7 @@ func (s *Service) validateAndWrite(ctx context.Context, p *project.Project, h *H
 		)
 	}
 
-	saved := SavedHighlight{Game: h.Game, Ringkasan: h.Ringkasan, Segmen: h.Segmen, Video: p.VideoFile, Durasi: p.DurationSec}
+	saved := SavedHighlight{Game: h.Game, Ringkasan: h.Ringkasan, Draft: h.Draft, Segmen: h.Segmen, Video: p.VideoFile, Durasi: p.DurationSec}
 	jsonBytes, err := json.MarshalIndent(saved, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("susun highlight.json: %w", err)
@@ -151,7 +190,7 @@ func (s *Service) validateAndWrite(ctx context.Context, p *project.Project, h *H
 	if err := os.WriteFile(highlightPath, jsonBytes, 0o644); err != nil {
 		return nil, fmt.Errorf("simpan highlight.json: %w", err)
 	}
-	if err := os.WriteFile(narasiPath, []byte(buildNarasi(h.Segmen)), 0o644); err != nil {
+	if err := os.WriteFile(narasiPath, []byte(buildNarasi(h.Draft, h.Segmen)), 0o644); err != nil {
 		return nil, fmt.Errorf("simpan narasi.txt: %w", err)
 	}
 	return &saved, nil

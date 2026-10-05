@@ -12,7 +12,7 @@ func TestBuildNarasi(t *testing.T) {
 		"[00:05:00 - 00:06:00] Early game\n" +
 		"Tim B mendapat first blood\n\n"
 
-	if got := buildNarasi(segmen); got != want {
+	if got := buildNarasi(nil, segmen); got != want {
 		t.Errorf("buildNarasi() = %q, want %q", got, want)
 	}
 }

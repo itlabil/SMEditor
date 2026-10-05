@@ -29,6 +29,7 @@ Kerjakan berurutan, satu tiket per sesi. Sebuah tiket selesai jika semua kriteri
 | SM-13 | Plugin: marker dan laporan | SM-12 |
 | SM-14 | Salin ke folder | SM-09 |
 | SM-15 | Ubah dan hapus segmen highlight | SM-09 |
+| SM-16 | Hasil draft untuk genre MOBA | SM-08, SM-15 |
 
 ---
 
@@ -179,3 +180,16 @@ Kriteria terima:
 - Tiap segmen punya tombol hapus dengan konfirmasi SweetAlert. Menghapus segmen terakhir ditolak; untuk itu pakai "Hapus highlight".
 - Endpoint: `PUT` dan `DELETE /api/projects/:id/highlight/segmen/:nomor` (nomor mulai dari 1). Kode error baru `segment_not_found` ditambahkan ke skill `sm-api-response`.
 - Unit test untuk ubah segmen (berhasil, tiap aturan validasi, nomor tidak ada) dan hapus segmen.
+
+## SM-16 — Hasil draft untuk genre MOBA
+
+Menyimpan hasil pick dan ban kedua tim dari transcript, untuk ditampilkan dan dipakai saat dubbing.
+
+Kriteria terima:
+- Skema: `highlight.json` mendapat field opsional `draft` berbentuk `{"tim_a":{"nama":"...","pick":["..."],"ban":["..."]},"tim_b":{...}}`. Validasi: jika ada, `pick` tiap tim maksimal 5 dan `ban` boleh kosong. Highlight tanpa `draft` tetap sah.
+- Prompt blok `moba` meminta AI mengisi `draft` dari transcript dengan urutan pick; nama hero memakai ejaan resmi game, salah dengar diperbaiki hanya jika jelas; hero yang tidak disebut caster tidak dikarang. Narasi segmen draft wajib menyebut semua hero yang di-pick tiap tim sebelum komentar soal komposisi.
+- Perubahan prompt lewat migrasi baru (`0005_moba_draft_prompt.sql`) yang hanya memperbarui blok `moba` jika `is_custom = 0`; `defaults.go` ikut diperbarui sehingga tes kesesuaian seed tetap lolos.
+- Di atas daftar highlight tampil kartu "Hasil draft" berisi pick dan ban kedua tim, dengan tombol "Ubah" seperti segmen (`PUT /api/projects/:id/highlight/draft`). Kesalahan validasi tampil di form tanpa mengubah file.
+- `narasi.txt` memuat hasil draft di bagian atas.
+- Field `draft` tidak membuat plugin Premiere gagal membaca file (plugin hanya membaca `segmen`).
+- Unit test untuk validasi `draft`, narasi dengan draft, ubah draft, dan migrasi yang tidak menimpa blok buatan pengguna.

@@ -194,3 +194,42 @@ func TestPromptBlockPlaceholdersHaveValues(t *testing.T) {
 		}
 	}
 }
+
+// TestMobaDraftPromptMigration checks 0005_moba_draft_prompt.sql (SM-16):
+// it updates the moba block only while the user has not customized it.
+func TestMobaDraftPromptMigration(t *testing.T) {
+	cases := []struct {
+		name      string
+		isCustom  int
+		wantDraft bool
+	}{
+		{"default block is updated", 0, true},
+		{"customized block is kept", 1, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			conn := openTestDB(t)
+			ctx := context.Background()
+
+			// Roll the moba block back to a pre-0005 state and replay 0005.
+			if _, err := conn.Exec(`UPDATE prompt_blocks SET body = 'teks lama', is_custom = ? WHERE code = 'moba'`, tc.isCustom); err != nil {
+				t.Fatalf("reset moba: %v", err)
+			}
+			if _, err := conn.Exec(`DELETE FROM schema_migrations WHERE version = '0005_moba_draft_prompt.sql'`); err != nil {
+				t.Fatalf("forget 0005: %v", err)
+			}
+			if err := Migrate(ctx, conn); err != nil {
+				t.Fatalf("Migrate: %v", err)
+			}
+
+			var body string
+			if err := conn.QueryRow(`SELECT body FROM prompt_blocks WHERE code = 'moba'`).Scan(&body); err != nil {
+				t.Fatalf("read moba: %v", err)
+			}
+			gotDraft := regexp.MustCompile(`"draft"`).MatchString(body)
+			if gotDraft != tc.wantDraft {
+				t.Errorf("moba body mentions draft = %v, want %v; body:\n%s", gotDraft, tc.wantDraft, body)
+			}
+		})
+	}
+}

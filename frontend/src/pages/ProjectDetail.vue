@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getProject, getPrompt, openFolder, exportToFolder, retryDownload, retryTranscribe, transcriptUrl, videoUrl } from '../api/projects'
 import { listGameModes, getPromptBlock } from '../api/promptBlocks'
-import { saveHighlight, getHighlight, deleteHighlight, narasiUrl, updateSegment, deleteSegment } from '../api/highlight'
+import { saveHighlight, getHighlight, deleteHighlight, narasiUrl, updateSegment, deleteSegment, updateDraft } from '../api/highlight'
 import { cancelJob } from '../api/jobs'
 import { getSettings } from '../api/settings'
 import { useNotify } from '../composables/useNotify'
@@ -46,6 +46,16 @@ const segmentFormErrors = ref([])
 const savingSegment = ref(false)
 const deletingSegmentIndex = ref(-1)
 
+// Draft result card (SM-16). Hero lists are edited as comma-separated text.
+const editingDraft = ref(false)
+const draftForm = ref(null)
+const draftErrors = ref([])
+const savingDraft = ref(false)
+const DRAFT_TEAMS = [
+  { key: 'tim_a', fallback: 'Tim A' },
+  { key: 'tim_b', fallback: 'Tim B' },
+]
+
 const videoEl = ref(null)
 const activeSegmentIndex = ref(-1)
 let stopAtSeconds = null
@@ -57,6 +67,10 @@ const pastDownload = computed(() =>
 // pipeline reaches these two statuses; everything that depends on
 // transcript.txt/json actually existing on disk is gated on this.
 const hasTranscript = computed(() => ['menunggu_highlight', 'siap_premiere'].includes(project.value?.status))
+const isMoba = computed(() => gameModes.value.find((g) => g.code === project.value?.game_code)?.genre === 'moba')
+// The draft card shows for any highlight that has a draft, and for MOBA
+// highlights without one so it can still be filled in by hand.
+const showDraftCard = computed(() => !!savedHighlight.value?.draft || isMoba.value)
 
 async function load() {
   loading.value = true
@@ -134,6 +148,53 @@ async function submitSegment() {
   }
 }
 
+function teamDraft(key) {
+  return savedHighlight.value?.draft?.[key] || { nama: '', pick: [], ban: [] }
+}
+
+function startEditDraft() {
+  const form = {}
+  for (const { key } of DRAFT_TEAMS) {
+    const t = teamDraft(key)
+    form[key] = { nama: t.nama || '', pick: (t.pick || []).join(', '), ban: (t.ban || []).join(', ') }
+  }
+  draftForm.value = form
+  draftErrors.value = []
+  editingDraft.value = true
+}
+
+function cancelEditDraft() {
+  editingDraft.value = false
+  draftErrors.value = []
+}
+
+function splitHeroes(text) {
+  return text
+    .split(',')
+    .map((h) => h.trim())
+    .filter(Boolean)
+}
+
+async function submitDraft() {
+  savingDraft.value = true
+  draftErrors.value = []
+  const body = {}
+  for (const { key } of DRAFT_TEAMS) {
+    const t = draftForm.value[key]
+    body[key] = { nama: t.nama.trim(), pick: splitHeroes(t.pick), ban: splitHeroes(t.ban) }
+  }
+  try {
+    savedHighlight.value = await updateDraft(route.params.id, body)
+    editingDraft.value = false
+    success('Hasil draft disimpan')
+  } catch (err) {
+    // Validation errors stay in the form; nothing was written on the server.
+    draftErrors.value = err.code === 'highlight_invalid' && err.details ? err.details : [{ field: '', message: err.message }]
+  } finally {
+    savingDraft.value = false
+  }
+}
+
 async function removeSegment(index, s) {
   const ok = await confirm({
     title: `Hapus segmen ${index + 1}?`,
@@ -161,6 +222,7 @@ async function submitHighlight() {
   try {
     savedHighlight.value = await saveHighlight(route.params.id, highlightBody.value)
     cancelEditSegment()
+    cancelEditDraft()
     project.value = await getProject(route.params.id)
     success('Highlight tersimpan')
   } catch (err) {
@@ -506,6 +568,73 @@ onUnmounted(() => sse.close())
             @timeupdate="onVideoTimeUpdate"
             @pause="onVideoPause"
           ></video>
+
+          <div v-if="showDraftCard" class="flex flex-col gap-2 rounded bg-slate-900 px-3 py-2 text-sm">
+            <div class="flex items-center justify-between">
+              <h3 class="font-medium">Hasil draft</h3>
+              <button
+                v-if="!editingDraft"
+                class="rounded bg-slate-800 px-2 py-1 text-xs hover:bg-slate-700"
+                @click="startEditDraft"
+              >
+                Ubah
+              </button>
+            </div>
+
+            <form v-if="editingDraft" class="flex flex-col gap-3" @submit.prevent="submitDraft">
+              <div class="grid gap-3 sm:grid-cols-2">
+                <fieldset v-for="team in DRAFT_TEAMS" :key="team.key" class="flex flex-col gap-2">
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-400">Nama {{ team.fallback }}</span>
+                    <input v-model="draftForm[team.key].nama" class="rounded bg-slate-800 px-3 py-1.5" />
+                  </label>
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-400">Pick, urut, pisahkan dengan koma (maks. 5)</span>
+                    <input v-model="draftForm[team.key].pick" class="rounded bg-slate-800 px-3 py-1.5" />
+                  </label>
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-400">Ban, pisahkan dengan koma (boleh kosong)</span>
+                    <input v-model="draftForm[team.key].ban" class="rounded bg-slate-800 px-3 py-1.5" />
+                  </label>
+                </fieldset>
+              </div>
+              <ul
+                v-if="draftErrors.length"
+                class="flex flex-col gap-1 rounded border border-rose-800 bg-rose-950/40 p-2 text-xs text-rose-300"
+              >
+                <li v-for="(e, ei) in draftErrors" :key="ei">
+                  <template v-if="e.segmen">Segmen {{ e.segmen }}: </template>{{ e.field ? `${e.field}: ` : '' }}{{ e.message }}
+                </li>
+              </ul>
+              <div class="flex gap-2">
+                <button
+                  type="submit"
+                  :disabled="savingDraft"
+                  class="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                >
+                  {{ savingDraft ? 'Menyimpan...' : 'Simpan' }}
+                </button>
+                <button type="button" class="rounded bg-slate-800 px-3 py-1.5 text-sm" @click="cancelEditDraft">Batal</button>
+              </div>
+            </form>
+
+            <p v-else-if="!savedHighlight.draft" class="text-xs text-slate-500">
+              Belum ada hasil draft di highlight ini. Klik Ubah untuk mengisinya.
+            </p>
+            <div v-else class="grid gap-3 sm:grid-cols-2">
+              <div v-for="team in DRAFT_TEAMS" :key="team.key" class="flex flex-col gap-1">
+                <p class="font-medium">{{ teamDraft(team.key).nama || team.fallback }}</p>
+                <p class="text-xs">
+                  <span class="text-slate-400">Pick:</span>
+                  {{ teamDraft(team.key).pick?.length ? teamDraft(team.key).pick.join(', ') : '-' }}
+                </p>
+                <p class="text-xs">
+                  <span class="text-slate-400">Ban:</span>
+                  {{ teamDraft(team.key).ban?.length ? teamDraft(team.key).ban.join(', ') : '-' }}
+                </p>
+              </div>
+            </div>
+          </div>
 
           <p class="text-sm text-slate-400">
             {{ savedHighlight.segmen.length }} segmen · total durasi highlight {{ formatHMS(savedHighlight.total_durasi_sec) }}
