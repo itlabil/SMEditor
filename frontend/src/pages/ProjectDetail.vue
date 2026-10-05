@@ -4,10 +4,11 @@ import { RouterLink, useRoute } from 'vue-router'
 import { getProject, getPrompt, openFolder, retryDownload, retryTranscribe, transcriptUrl, videoUrl } from '../api/projects'
 import { listGameModes } from '../api/promptBlocks'
 import { saveHighlight, getHighlight, deleteHighlight, narasiUrl } from '../api/highlight'
+import { cancelJob } from '../api/jobs'
 import { useNotify } from '../composables/useNotify'
 import { useConfirm } from '../composables/useConfirm'
 import { useSSE } from '../composables/useSSE'
-import { statusLabel, gameName } from '../lib/labels'
+import { statusLabel, gameName, jobTypeLabel } from '../lib/labels'
 import AppLayout from '../components/AppLayout.vue'
 
 const route = useRoute()
@@ -19,6 +20,7 @@ const gameModes = ref([])
 const loading = ref(true)
 const retrying = ref(false)
 const retryingTranscript = ref(false)
+const cancellingJob = ref(false)
 const transcriptLang = ref('auto')
 const job = ref(null)
 const promptText = ref('')
@@ -190,19 +192,39 @@ async function retry() {
 
 async function retryTranscript() {
   retryingTranscript.value = true
+  // Clear the old error and show the new state immediately: the
+  // request's own response can still reflect the pre-retry status
+  // (the worker hasn't picked the job up yet when it returns), so
+  // don't wait for it or for the next SSE event to update the screen.
+  if (project.value) {
+    project.value = { ...project.value, status: 'transcript', error_message: '' }
+  }
   try {
-    project.value = await retryTranscribe(route.params.id, transcriptLang.value)
+    await retryTranscribe(route.params.id, transcriptLang.value)
     success('Transkrip diulang')
   } catch (err) {
     error(err.message)
+    await load() // the retry itself was rejected (e.g. job_running); restore the real state
   } finally {
     retryingTranscript.value = false
   }
 }
 
+async function cancelCurrentJob() {
+  if (!job.value?.id) return
+  cancellingJob.value = true
+  try {
+    await cancelJob(job.value.id)
+  } catch (err) {
+    error(err.message)
+  } finally {
+    cancellingJob.value = false
+  }
+}
+
 function onJobEvent(ev) {
   if (ev.type === 'progress') {
-    job.value = { type: ev.job_type, progress: ev.progress, message: ev.message }
+    job.value = { id: ev.job_id, type: ev.job_type, progress: ev.progress, message: ev.message }
     return
   }
   // done, failed, canceled: reload from the API instead of guessing the
@@ -252,13 +274,14 @@ onUnmounted(() => sse.close())
 
       <div v-if="job" class="flex flex-col gap-1">
         <div class="flex justify-between text-sm text-slate-400">
-          <span>{{ job.type }}</span>
+          <span>{{ jobTypeLabel(job.type) }}</span>
           <span>{{ Math.round(job.progress) }}%</span>
         </div>
         <div class="h-2 w-full overflow-hidden rounded bg-slate-800">
           <div class="h-full bg-emerald-500 transition-all" :style="{ width: job.progress + '%' }"></div>
         </div>
-        <p v-if="job.message" class="text-xs text-slate-500">{{ job.message }}</p>
+        <p v-if="job.type === 'transcribe' && job.progress === 0" class="text-xs text-slate-500">Memuat model...</p>
+        <p v-else-if="job.message" class="text-xs text-slate-500">{{ job.message }}</p>
       </div>
 
       <div v-if="project.status === 'gagal_unduh'" class="flex flex-col gap-2 rounded border border-rose-800 bg-rose-950/40 p-3">
@@ -285,11 +308,20 @@ onUnmounted(() => sse.close())
             <input v-model="transcriptLang" class="rounded bg-slate-800 px-3 py-2" />
           </label>
           <button
+            v-if="!job"
             :disabled="retryingTranscript"
             class="rounded bg-emerald-600 px-3 py-2 text-sm font-medium disabled:opacity-50"
             @click="retryTranscript"
           >
             {{ retryingTranscript ? 'Memproses...' : 'Transkrip ulang' }}
+          </button>
+          <button
+            v-else
+            :disabled="cancellingJob"
+            class="rounded bg-rose-700 px-3 py-2 text-sm font-medium disabled:opacity-50"
+            @click="cancelCurrentJob"
+          >
+            {{ cancellingJob ? 'Membatalkan...' : 'Batalkan' }}
           </button>
         </div>
 

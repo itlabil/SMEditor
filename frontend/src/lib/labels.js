@@ -25,3 +25,15 @@ export function gameName(gameModes, code) {
   const found = gameModes.find((g) => g.code === code)
   return found ? found.name : code
 }
+
+const JOB_TYPE_LABELS = {
+  download: 'Mengunduh video',
+  convert: 'Mengonversi video',
+  transcribe: 'Membuat transcript',
+}
+
+// jobTypeLabel returns a friendly label for a job's type (the SSE
+// event's job_type), falling back to the raw type for anything new.
+export function jobTypeLabel(type) {
+  return JOB_TYPE_LABELS[type] || type
+}
