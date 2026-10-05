@@ -10,8 +10,21 @@ import (
 	"smeditor/internal/db"
 	"smeditor/internal/httpx"
 	"smeditor/internal/modules/job"
+	"smeditor/internal/modules/prompt"
 	"smeditor/internal/storage"
 )
+
+type fakePromptAssembler struct {
+	text string
+	err  error
+}
+
+func (f *fakePromptAssembler) Assemble(ctx context.Context, in prompt.AssembleInput) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.text, nil
+}
 
 type fakeJobs struct {
 	calledForProject string // last CancelAllForProject target
@@ -57,7 +70,7 @@ func newTestServiceWithJobs(t *testing.T) (*Service, *fakeJobs) {
 	repo := NewRepository(conn)
 	st := storage.New(t.TempDir())
 	jobs := &fakeJobs{}
-	return NewService(repo, st, jobs), jobs
+	return NewService(repo, st, jobs, &fakePromptAssembler{text: "prompt palsu"}), jobs
 }
 
 func validRequest() CreateRequest {

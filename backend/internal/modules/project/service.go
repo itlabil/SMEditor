@@ -9,6 +9,7 @@ import (
 	"smeditor/internal/httpx"
 	"smeditor/internal/idgen"
 	"smeditor/internal/modules/job"
+	"smeditor/internal/modules/prompt"
 	"smeditor/internal/storage"
 )
 
@@ -37,14 +38,37 @@ type Jobs interface {
 	JobChecker
 }
 
+// PromptAssembler builds the AI prompt text for a project. Implemented by
+// prompt.Service.
+type PromptAssembler interface {
+	Assemble(ctx context.Context, in prompt.AssembleInput) (string, error)
+}
+
 type Service struct {
 	repo    *Repository
 	storage *storage.Storage
 	jobs    Jobs
+	prompt  PromptAssembler
 }
 
-func NewService(repo *Repository, st *storage.Storage, jobs Jobs) *Service {
-	return &Service{repo: repo, storage: st, jobs: jobs}
+func NewService(repo *Repository, st *storage.Storage, jobs Jobs, promptAssembler PromptAssembler) *Service {
+	return &Service{repo: repo, storage: st, jobs: jobs, prompt: promptAssembler}
+}
+
+// Prompt assembles the AI prompt text for a project, per docs/prd.md.
+func (s *Service) Prompt(ctx context.Context, id string) (string, error) {
+	p, err := s.findByID(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return s.prompt.Assemble(ctx, prompt.AssembleInput{
+		GameCode:      p.GameCode,
+		VideoTitle:    p.VideoTitle,
+		DurationSec:   p.DurationSec,
+		TeamA:         p.TeamA,
+		TeamB:         p.TeamB,
+		TargetMinutes: p.TargetMinutes,
+	})
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*Project, error) {

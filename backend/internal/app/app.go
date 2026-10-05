@@ -14,6 +14,7 @@ import (
 	"smeditor/internal/httpx"
 	"smeditor/internal/modules/job"
 	"smeditor/internal/modules/project"
+	"smeditor/internal/modules/prompt"
 	"smeditor/internal/modules/settings"
 	"smeditor/internal/storage"
 	"smeditor/internal/tools"
@@ -38,6 +39,10 @@ func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Eng
 	settingsRepo := settings.NewRepository(conn)
 	settingsSvc := settings.NewService(settingsRepo, ytdlp.Client{}, ffmpeg.Ffmpeg{}, ffmpeg.Ffprobe{}, whisper.Client{})
 	settings.NewHandler(settingsSvc).Register(api)
+
+	promptRepo := prompt.NewRepository(conn)
+	promptSvc := prompt.NewService(promptRepo)
+	prompt.NewHandler(promptSvc).Register(api)
 
 	projectRepo := project.NewRepository(conn)
 
@@ -65,7 +70,7 @@ func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Eng
 	}
 	jobWorker.Start(ctx)
 
-	projectSvc := project.NewService(projectRepo, st, jobSvc)
+	projectSvc := project.NewService(projectRepo, st, jobSvc, promptSvc)
 	project.NewHandler(projectSvc).Register(api)
 
 	registerFrontend(r)

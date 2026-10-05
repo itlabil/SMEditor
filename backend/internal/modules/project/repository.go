@@ -148,9 +148,11 @@ func (r *Repository) UpdateVideoCodecAndSize(ctx context.Context, id, codec stri
 	return nil
 }
 
-// GameExists checks game_modes, the reference table of game modes seeded by
-// migration. No module owns game_modes yet (it will move behind the prompt
-// module in SM-08), so project queries it directly for now.
+// GameExists checks game_modes, a reference table also read directly by
+// the prompt module (prompt.Repository.FindGameMode) to assemble
+// prompts. project queries it directly here too, rather than calling
+// into prompt, since project already depends on prompt (to assemble a
+// project's prompt text) and the reverse would be an import cycle.
 func (r *Repository) GameExists(ctx context.Context, code string) (bool, error) {
 	var exists int
 	err := r.db.QueryRowContext(ctx, `SELECT 1 FROM game_modes WHERE code = ?`, code).Scan(&exists)

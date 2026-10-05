@@ -20,6 +20,7 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	g.POST("/:id/download", h.retryDownload)
 	g.POST("/:id/transcribe", h.retryTranscribe)
 	g.GET("/:id/transcript", h.transcript)
+	g.GET("/:id/prompt", h.prompt)
 }
 
 func (h *Handler) list(c *gin.Context) {
@@ -104,4 +105,13 @@ func (h *Handler) transcript(c *gin.Context) {
 		return
 	}
 	c.FileAttachment(path, filename)
+}
+
+func (h *Handler) prompt(c *gin.Context) {
+	text, err := h.svc.Prompt(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, gin.H{"prompt": text})
 }

@@ -1,9 +1,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { getSettings, updateSettings, checkTools } from '../api/settings'
+import { getPromptBlock, updatePromptBlock, resetPromptBlock } from '../api/promptBlocks'
 import { useNotify } from '../composables/useNotify'
+import { useConfirm } from '../composables/useConfirm'
 
 const { success, error } = useNotify()
+const { confirm } = useConfirm()
 
 const form = ref({
   ytdlp_path: '',
@@ -52,7 +55,66 @@ async function runCheck() {
   }
 }
 
-onMounted(load)
+const blockCodes = ['frame', 'moba', 'br', 'fps', 'bola', 'umum']
+const selectedBlock = ref('frame')
+const blockForm = ref({ body: '', categories: '' })
+const blockLoading = ref(false)
+const blockSaving = ref(false)
+
+async function loadBlock() {
+  blockLoading.value = true
+  try {
+    const b = await getPromptBlock(selectedBlock.value)
+    blockForm.value = { body: b.body, categories: b.categories.join(', ') }
+  } catch (err) {
+    error(err.message)
+  } finally {
+    blockLoading.value = false
+  }
+}
+
+function categoriesList() {
+  return blockForm.value.categories
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean)
+}
+
+async function saveBlock() {
+  blockSaving.value = true
+  try {
+    const b = await updatePromptBlock(selectedBlock.value, blockForm.value.body, categoriesList())
+    blockForm.value = { body: b.body, categories: b.categories.join(', ') }
+    success('Blok prompt tersimpan')
+  } catch (err) {
+    error(err.message)
+  } finally {
+    blockSaving.value = false
+  }
+}
+
+async function resetBlock() {
+  const ok = await confirm({
+    title: 'Kembalikan ke bawaan?',
+    text: `Perubahan pada blok "${selectedBlock.value}" akan dihapus.`,
+  })
+  if (!ok) return
+  blockSaving.value = true
+  try {
+    const b = await resetPromptBlock(selectedBlock.value)
+    blockForm.value = { body: b.body, categories: b.categories.join(', ') }
+    success('Blok prompt dikembalikan ke bawaan')
+  } catch (err) {
+    error(err.message)
+  } finally {
+    blockSaving.value = false
+  }
+}
+
+onMounted(() => {
+  load()
+  loadBlock()
+})
 </script>
 
 <template>
@@ -125,6 +187,43 @@ onMounted(load)
           </span>
         </li>
       </ul>
+    </section>
+
+    <section class="flex flex-col gap-3 border-t border-slate-800 pt-6">
+      <h2 class="text-lg font-semibold">Blok prompt</h2>
+      <label class="flex flex-col gap-1">
+        <span class="text-sm text-slate-400">Blok</span>
+        <select v-model="selectedBlock" class="rounded bg-slate-800 px-3 py-2" @change="loadBlock">
+          <option v-for="code in blockCodes" :key="code" :value="code">{{ code }}</option>
+        </select>
+      </label>
+
+      <template v-if="!blockLoading">
+        <label class="flex flex-col gap-1">
+          <span class="text-sm text-slate-400">Isi blok</span>
+          <textarea v-model="blockForm.body" rows="12" class="rounded bg-slate-800 p-3 font-mono text-xs"></textarea>
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-sm text-slate-400">Kategori (pisahkan dengan koma)</span>
+          <input v-model="blockForm.categories" class="rounded bg-slate-800 px-3 py-2" />
+        </label>
+        <div class="flex gap-2">
+          <button
+            :disabled="blockSaving"
+            class="rounded bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
+            @click="saveBlock"
+          >
+            {{ blockSaving ? 'Menyimpan...' : 'Simpan blok' }}
+          </button>
+          <button
+            :disabled="blockSaving"
+            class="rounded bg-slate-800 px-4 py-2 font-medium disabled:opacity-50"
+            @click="resetBlock"
+          >
+            Kembalikan ke bawaan
+          </button>
+        </div>
+      </template>
     </section>
   </main>
 </template>

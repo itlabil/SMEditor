@@ -31,3 +31,7 @@ export function retryTranscribe(id, transcriptLang) {
 export function transcriptUrl(id, format) {
   return `/api/projects/${id}/transcript?format=${format}`
 }
+
+export function getPrompt(id) {
+  return request('GET', `/projects/${id}/prompt`)
+}

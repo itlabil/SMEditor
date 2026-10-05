@@ -95,6 +95,8 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `tool_not_found` | 409 | yt-dlp, ffmpeg, atau Whisper tidak ditemukan |
 | `thumbnail_not_found` | 404 | Thumbnail project belum tersedia |
 | `invalid_format` | 400 | Parameter `format` bukan `txt` atau `json` |
+| `prompt_block_not_found` | 404 | Kode blok prompt tidak dikenal |
+| `prompt_body_required` | 422 | Isi blok prompt kosong |
 | `unknown_setting_key` | 400 | Key pengaturan tidak dikenal |
 | `invalid_whisper_device` | 400 | `whisper_device` bukan `auto`, `cpu`, atau `gpu` |
 | `internal_error` | 500 | Kesalahan tak terduga |

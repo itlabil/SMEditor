@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listProjects, createProject, deleteProject, thumbnailUrl } from '../api/projects'
+import { listGameModes } from '../api/promptBlocks'
 import { useNotify } from '../composables/useNotify'
 import { useConfirm } from '../composables/useConfirm'
 
@@ -9,6 +10,7 @@ const { success, error } = useNotify()
 const { confirm } = useConfirm()
 
 const projects = ref([])
+const gameModes = ref([])
 const loading = ref(true)
 const creating = ref(false)
 
@@ -17,7 +19,9 @@ const form = ref({ name: '', game_code: '', youtube_url: '', team_a: '', team_b:
 async function load() {
   loading.value = true
   try {
-    projects.value = await listProjects()
+    const [p, g] = await Promise.all([listProjects(), listGameModes()])
+    projects.value = p
+    gameModes.value = g
   } catch (err) {
     error(err.message)
   } finally {
@@ -93,8 +97,11 @@ onMounted(load)
         <input v-model="form.name" required class="rounded bg-slate-800 px-3 py-2" />
       </label>
       <label class="flex flex-col gap-1">
-        <span class="text-sm text-slate-400">Kode game (contoh: mlbb, valorant, umum)</span>
-        <input v-model="form.game_code" required class="rounded bg-slate-800 px-3 py-2" />
+        <span class="text-sm text-slate-400">Game</span>
+        <select v-model="form.game_code" required class="rounded bg-slate-800 px-3 py-2">
+          <option value="" disabled>Pilih game</option>
+          <option v-for="g in gameModes" :key="g.code" :value="g.code">{{ g.name }}</option>
+        </select>
       </label>
       <label class="flex flex-col gap-1">
         <span class="text-sm text-slate-400">URL YouTube</span>

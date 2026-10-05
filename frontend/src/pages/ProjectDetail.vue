@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { getProject, retryDownload, retryTranscribe, transcriptUrl } from '../api/projects'
+import { getProject, getPrompt, retryDownload, retryTranscribe, transcriptUrl } from '../api/projects'
 import { useNotify } from '../composables/useNotify'
 import { useSSE } from '../composables/useSSE'
 
@@ -14,6 +14,7 @@ const retrying = ref(false)
 const retryingTranscript = ref(false)
 const transcriptLang = ref('auto')
 const job = ref(null)
+const promptText = ref('')
 
 const pastDownload = computed(() =>
   ['transcript', 'gagal_transcript', 'menunggu_highlight', 'siap_premiere'].includes(project.value?.status),
@@ -26,10 +27,22 @@ async function load() {
     if (project.value.transcript_lang) {
       transcriptLang.value = project.value.transcript_lang
     }
+    if (pastDownload.value) {
+      promptText.value = (await getPrompt(route.params.id)).prompt
+    }
   } catch (err) {
     error(err.message)
   } finally {
     loading.value = false
+  }
+}
+
+async function copyPrompt() {
+  try {
+    await navigator.clipboard.writeText(promptText.value)
+    success('Prompt disalin')
+  } catch (err) {
+    error('Gagal menyalin prompt')
   }
 }
 
@@ -145,6 +158,19 @@ onUnmounted(() => sse.close())
           <a :href="transcriptUrl(project.id, 'txt')" class="text-emerald-400 underline">Unduh transcript.txt</a>
           <a :href="transcriptUrl(project.id, 'json')" class="text-emerald-400 underline">Unduh transcript.json</a>
         </div>
+      </section>
+
+      <section v-if="pastDownload && promptText" class="flex flex-col gap-2 border-t border-slate-800 pt-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Prompt</h2>
+          <button class="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium" @click="copyPrompt">Salin prompt</button>
+        </div>
+        <textarea
+          :value="promptText"
+          readonly
+          rows="10"
+          class="rounded bg-slate-900 p-3 text-xs text-slate-300"
+        ></textarea>
       </section>
     </template>
   </main>

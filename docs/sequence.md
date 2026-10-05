@@ -23,6 +23,7 @@ Semua respons API berformat JSON: `{"data": ...}` saat berhasil, `{"error": {"co
 | POST | `/api/projects/:id/open-folder` | Buka folder project di file manager |
 | GET | `/api/game-modes` | Daftar mode game |
 | GET, PUT | `/api/prompt-blocks/:code` | Baca dan ubah blok prompt |
+| POST | `/api/prompt-blocks/:code/reset` | Kembalikan blok prompt ke bawaan |
 | GET, PUT | `/api/settings` | Baca dan ubah pengaturan |
 | GET | `/api/settings/check` | Periksa apakah tiap tool ditemukan |
 
