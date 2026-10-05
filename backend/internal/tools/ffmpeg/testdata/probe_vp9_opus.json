@@ -1,0 +1,36 @@
+{
+    "streams": [
+        {
+            "index": 0,
+            "codec_name": "vp9",
+            "codec_long_name": "Google VP9",
+            "profile": "Profile 0",
+            "codec_type": "video",
+            "codec_tag_string": "[0][0][0][0]",
+            "width": 3840,
+            "height": 2160,
+            "r_frame_rate": "30000/1001",
+            "avg_frame_rate": "30000/1001",
+            "duration": "635.023000"
+        },
+        {
+            "index": 1,
+            "codec_name": "opus",
+            "codec_long_name": "Opus",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 2,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "duration": "635.041000"
+        }
+    ],
+    "format": {
+        "filename": "source.webm",
+        "nb_streams": 2,
+        "format_name": "matroska,webm",
+        "duration": "635.041000",
+        "size": "812345678",
+        "bit_rate": "10234567"
+    }
+}

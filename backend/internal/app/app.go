@@ -39,18 +39,30 @@ func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Eng
 	settingsSvc := settings.NewService(settingsRepo, ytdlp.Client{}, ffmpeg.Ffmpeg{}, ffmpeg.Ffprobe{}, whisper.Client{})
 	settings.NewHandler(settingsSvc).Register(api)
 
+	projectRepo := project.NewRepository(conn)
+
 	jobRepo := job.NewRepository(conn)
 	jobHub := job.NewHub()
 	jobWorker := job.NewWorker(jobRepo, jobHub, nil)
 	jobSvc := job.NewService(jobRepo, jobWorker)
 	job.NewHandler(jobSvc, jobHub).Register(api)
 
+	// JobSync needs jobSvc (to chain convert -> transcribe) and jobWorker
+	// needs JobSync as its hook, so the hook is wired in after both exist
+	// rather than passed into NewWorker.
+	jobWorker.SetHook(project.NewJobSync(projectRepo, jobSvc))
+
+	ytdlpClient := ytdlp.Client{}
+	ffmpegClient := ffmpeg.Ffmpeg{}
+	ffprobeClient := ffmpeg.Ffprobe{}
+	jobWorker.Register(project.NewDownloadRunner(projectRepo, st, settingsSvc, ytdlpClient, ffprobeClient, ffmpegClient, jobSvc))
+	jobWorker.Register(project.NewConvertRunner(projectRepo, st, settingsSvc, ffmpegClient, ffprobeClient))
+
 	if err := jobWorker.RecoverStaleRunning(ctx); err != nil {
 		return nil, err
 	}
 	jobWorker.Start(ctx)
 
-	projectRepo := project.NewRepository(conn)
 	projectSvc := project.NewService(projectRepo, st, jobSvc)
 	project.NewHandler(projectSvc).Register(api)
 

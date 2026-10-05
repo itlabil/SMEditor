@@ -59,6 +59,15 @@ func NewWorker(repo *Repository, hub *Hub, hook ProjectHook) *Worker {
 	}
 }
 
+// SetHook assigns the ProjectHook after construction, for wiring where the
+// hook implementation itself needs a reference to this worker's Service
+// (a construction-order cycle: Worker -> Service -> hook -> Worker). Call
+// before RecoverStaleRunning/Start; it is not safe to call once the
+// worker is running.
+func (w *Worker) SetHook(hook ProjectHook) {
+	w.hook = hook
+}
+
 // Register adds a Runner for one job type. Call before Start.
 func (w *Worker) Register(r Runner) {
 	w.runners[r.Type()] = r

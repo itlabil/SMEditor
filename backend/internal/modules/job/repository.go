@@ -78,6 +78,22 @@ func (r *Repository) FindRunning(ctx context.Context) ([]Job, error) {
 	return out, nil
 }
 
+// ExistsActiveForProject reports whether projectID has a job that is
+// queued or running, used to reject a retry while one is already in
+// flight (the job_running error).
+func (r *Repository) ExistsActiveForProject(ctx context.Context, projectID string) (bool, error) {
+	const q = `SELECT 1 FROM jobs WHERE project_id = ? AND status IN (?, ?) LIMIT 1`
+	var exists int
+	err := r.db.QueryRowContext(ctx, q, projectID, StatusQueued, StatusRunning).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("check active job for project %s: %w", projectID, err)
+	}
+	return true, nil
+}
+
 func (r *Repository) FindLatestByProject(ctx context.Context, projectID string) (*Job, error) {
 	const q = `SELECT ` + jobColumns + ` FROM jobs WHERE project_id = ? ORDER BY created_at DESC LIMIT 1`
 	j, err := scanJob(r.db.QueryRowContext(ctx, q, projectID))

@@ -14,6 +14,13 @@ const (
 	StatusCanceled = "canceled"
 )
 
+// Job types, per docs/erd.md.
+const (
+	TypeDownload   = "download"
+	TypeConvert    = "convert"
+	TypeTranscribe = "transcribe"
+)
+
 type Job struct {
 	ID         string
 	ProjectID  string

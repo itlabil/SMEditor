@@ -8,23 +8,42 @@ import (
 
 	"smeditor/internal/httpx"
 	"smeditor/internal/idgen"
+	"smeditor/internal/modules/job"
 	"smeditor/internal/storage"
 )
 
 // JobCanceler stops every job (running or queued) for a project before its
-// folder is deleted, implemented by the job module and injected from
-// internal/app, per .agents/skills/sm-job-worker.
+// folder is deleted, per .agents/skills/sm-job-worker.
 type JobCanceler interface {
 	CancelAllForProject(ctx context.Context, projectID string) error
+}
+
+// JobEnqueuer queues a new job for a project.
+type JobEnqueuer interface {
+	Enqueue(ctx context.Context, projectID, jobType string) (*job.Job, error)
+}
+
+// JobChecker reports whether a project already has a job in flight, so a
+// retry can be rejected instead of racing the existing one.
+type JobChecker interface {
+	HasActiveJob(ctx context.Context, projectID string) (bool, error)
+}
+
+// Jobs is everything the project module needs from the job module,
+// implemented by job.Service and injected from internal/app.
+type Jobs interface {
+	JobCanceler
+	JobEnqueuer
+	JobChecker
 }
 
 type Service struct {
 	repo    *Repository
 	storage *storage.Storage
-	jobs    JobCanceler
+	jobs    Jobs
 }
 
-func NewService(repo *Repository, st *storage.Storage, jobs JobCanceler) *Service {
+func NewService(repo *Repository, st *storage.Storage, jobs Jobs) *Service {
 	return &Service{repo: repo, storage: st, jobs: jobs}
 }
 
@@ -65,7 +84,30 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*Project, erro
 	if _, err := s.storage.EnsureProjectDir(p.ID); err != nil {
 		return nil, err
 	}
+	if _, err := s.jobs.Enqueue(ctx, p.ID, job.TypeDownload); err != nil {
+		return nil, err
+	}
 	return p, nil
+}
+
+// RetryDownload queues a new download job for id, e.g. after a failed
+// download or to re-fetch after the URL was fixed. It rejects the retry
+// if a job is already in flight for this project.
+func (s *Service) RetryDownload(ctx context.Context, id string) (*Project, error) {
+	if _, err := s.findByID(ctx, id); err != nil {
+		return nil, err
+	}
+	active, err := s.jobs.HasActiveJob(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if active {
+		return nil, httpx.ErrConflict("job_running", "Masih ada job berjalan untuk project ini")
+	}
+	if _, err := s.jobs.Enqueue(ctx, id, job.TypeDownload); err != nil {
+		return nil, err
+	}
+	return s.Get(ctx, id)
 }
 
 func (s *Service) List(ctx context.Context) ([]Project, error) {

@@ -64,6 +64,13 @@ func (s *Service) CancelAllForProject(ctx context.Context, projectID string) err
 	return s.worker.CancelAllForProject(ctx, projectID)
 }
 
+// HasActiveJob reports whether projectID has a job that is queued or
+// running, used to reject a retry (e.g. POST /api/projects/:id/download)
+// while one is already in flight.
+func (s *Service) HasActiveJob(ctx context.Context, projectID string) (bool, error) {
+	return s.repo.ExistsActiveForProject(ctx, projectID)
+}
+
 // LatestEventForProject reconstructs the event for a project's most
 // recent job, so a freshly opened SSE connection can be correct
 // immediately, per .agents/skills/sm-job-worker. It returns nil, nil if

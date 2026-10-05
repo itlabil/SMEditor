@@ -84,6 +84,58 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// UpdateStatus sets a project's status and error_message, per the status
+// table in docs/flow.md section 3. errorMessage is cleared ("") on a
+// successful transition.
+func (r *Repository) UpdateStatus(ctx context.Context, id, status, errorMessage string) error {
+	const q = `UPDATE projects SET status = ?, error_message = ?, updated_at = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, q, status, errorMessage, formatTime(time.Now()), id)
+	if err != nil {
+		return fmt.Errorf("update project %s status: %w", id, err)
+	}
+	return nil
+}
+
+// DownloadMetadata is what a finished download writes back to the
+// project row, per docs/erd.md.
+type DownloadMetadata struct {
+	VideoTitle  string
+	DurationSec float64
+	Width       int
+	Height      int
+	FPS         float64
+	VideoCodec  string
+	VideoFile   string
+	SizeBytes   int64
+}
+
+func (r *Repository) SaveDownloadMetadata(ctx context.Context, id string, m DownloadMetadata) error {
+	const q = `UPDATE projects SET
+		video_title = ?, duration_sec = ?, width = ?, height = ?, fps = ?,
+		video_codec = ?, video_file = ?, size_bytes = ?, updated_at = ?
+		WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, q,
+		m.VideoTitle, m.DurationSec, m.Width, m.Height, m.FPS,
+		m.VideoCodec, m.VideoFile, m.SizeBytes, formatTime(time.Now()),
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("save download metadata for %s: %w", id, err)
+	}
+	return nil
+}
+
+// UpdateVideoCodecAndSize is used after a convert job re-encodes the
+// video in place: the codec and file size change, nothing else.
+func (r *Repository) UpdateVideoCodecAndSize(ctx context.Context, id, codec string, sizeBytes int64) error {
+	const q = `UPDATE projects SET video_codec = ?, size_bytes = ?, updated_at = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, q, codec, sizeBytes, formatTime(time.Now()), id)
+	if err != nil {
+		return fmt.Errorf("update video codec for %s: %w", id, err)
+	}
+	return nil
+}
+
 // GameExists checks game_modes, the reference table of game modes seeded by
 // migration. No module owns game_modes yet (it will move behind the prompt
 // module in SM-08), so project queries it directly for now.

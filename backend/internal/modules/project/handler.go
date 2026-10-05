@@ -17,6 +17,7 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	g.GET("/:id", h.get)
 	g.DELETE("/:id", h.delete)
 	g.GET("/:id/thumbnail", h.thumbnail)
+	g.POST("/:id/download", h.retryDownload)
 }
 
 func (h *Handler) list(c *gin.Context) {
@@ -66,4 +67,13 @@ func (h *Handler) thumbnail(c *gin.Context) {
 		return
 	}
 	c.File(path)
+}
+
+func (h *Handler) retryDownload(c *gin.Context) {
+	p, err := h.svc.RetryDownload(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, p)
 }

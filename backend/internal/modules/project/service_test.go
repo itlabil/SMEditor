@@ -9,16 +9,32 @@ import (
 
 	"smeditor/internal/db"
 	"smeditor/internal/httpx"
+	"smeditor/internal/modules/job"
 	"smeditor/internal/storage"
 )
 
-type fakeJobCanceler struct {
-	calledForProject string
+type fakeJobs struct {
+	calledForProject string // last CancelAllForProject target
+	enqueued         []string
+	active           bool
+	enqueueErr       error
 }
 
-func (f *fakeJobCanceler) CancelAllForProject(ctx context.Context, projectID string) error {
+func (f *fakeJobs) CancelAllForProject(ctx context.Context, projectID string) error {
 	f.calledForProject = projectID
 	return nil
+}
+
+func (f *fakeJobs) Enqueue(ctx context.Context, projectID, jobType string) (*job.Job, error) {
+	if f.enqueueErr != nil {
+		return nil, f.enqueueErr
+	}
+	f.enqueued = append(f.enqueued, jobType)
+	return &job.Job{ID: "fake-job", ProjectID: projectID, Type: jobType, Status: job.StatusQueued}, nil
+}
+
+func (f *fakeJobs) HasActiveJob(ctx context.Context, projectID string) (bool, error) {
+	return f.active, nil
 }
 
 func newTestService(t *testing.T) *Service {
@@ -27,7 +43,7 @@ func newTestService(t *testing.T) *Service {
 	return svc
 }
 
-func newTestServiceWithJobs(t *testing.T) (*Service, *fakeJobCanceler) {
+func newTestServiceWithJobs(t *testing.T) (*Service, *fakeJobs) {
 	t.Helper()
 	conn, err := db.Open(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
@@ -40,7 +56,7 @@ func newTestServiceWithJobs(t *testing.T) (*Service, *fakeJobCanceler) {
 
 	repo := NewRepository(conn)
 	st := storage.New(t.TempDir())
-	jobs := &fakeJobCanceler{}
+	jobs := &fakeJobs{}
 	return NewService(repo, st, jobs), jobs
 }
 
@@ -62,7 +78,7 @@ func appErrCode(t *testing.T, err error) string {
 }
 
 func TestServiceCreate_Success(t *testing.T) {
-	svc := newTestService(t)
+	svc, jobs := newTestServiceWithJobs(t)
 
 	p, err := svc.Create(context.Background(), validRequest())
 	if err != nil {
@@ -81,6 +97,10 @@ func TestServiceCreate_Success(t *testing.T) {
 	}
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		t.Fatalf("project dir %s was not created", dir)
+	}
+
+	if len(jobs.enqueued) != 1 || jobs.enqueued[0] != job.TypeDownload {
+		t.Errorf("enqueued jobs = %v, want exactly one %q", jobs.enqueued, job.TypeDownload)
 	}
 }
 
@@ -219,5 +239,62 @@ func TestServiceDelete_RejectsPathTraversalID(t *testing.T) {
 	}
 	if code := appErrCode(t, err); code != "invalid_id" {
 		t.Errorf("code = %q, want invalid_id", code)
+	}
+}
+
+func TestServiceRetryDownload_EnqueuesWhenIdle(t *testing.T) {
+	svc, jobs := newTestServiceWithJobs(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	jobs.enqueued = nil // reset what Create itself enqueued
+
+	got, err := svc.RetryDownload(ctx, p.ID)
+	if err != nil {
+		t.Fatalf("RetryDownload: %v", err)
+	}
+	if got.ID != p.ID {
+		t.Errorf("RetryDownload returned project %q, want %q", got.ID, p.ID)
+	}
+	if len(jobs.enqueued) != 1 || jobs.enqueued[0] != job.TypeDownload {
+		t.Errorf("enqueued jobs = %v, want exactly one %q", jobs.enqueued, job.TypeDownload)
+	}
+}
+
+func TestServiceRetryDownload_RejectsWhenJobActive(t *testing.T) {
+	svc, jobs := newTestServiceWithJobs(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	jobs.enqueued = nil
+	jobs.active = true
+
+	_, err = svc.RetryDownload(ctx, p.ID)
+	if err == nil {
+		t.Fatal("RetryDownload while a job is active: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "job_running" {
+		t.Errorf("code = %q, want job_running", code)
+	}
+	if len(jobs.enqueued) != 0 {
+		t.Errorf("enqueued jobs = %v, want none", jobs.enqueued)
+	}
+}
+
+func TestServiceRetryDownload_NotFound(t *testing.T) {
+	svc := newTestService(t)
+
+	_, err := svc.RetryDownload(context.Background(), "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	if err == nil {
+		t.Fatal("RetryDownload with unknown id: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "project_not_found" {
+		t.Errorf("code = %q, want project_not_found", code)
 	}
 }

@@ -18,6 +18,10 @@ const (
 	TranscriptTXTFile  = "transcript.txt"
 	HighlightFile      = "highlight.json"
 	NarrationFile      = "narasi.txt"
+	// ConvertTempFile is where a codec conversion writes its output
+	// before it replaces SourceVideoFile, so a canceled or failed
+	// conversion never corrupts the original.
+	ConvertTempFile = "convert_tmp.mp4"
 	ThumbnailFile      = "thumbnail.jpg"
 )
 
