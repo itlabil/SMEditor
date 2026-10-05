@@ -101,7 +101,7 @@ Butuh Go dan Node.js (npm). Dari root repo, jalankan di PowerShell:
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-Skrip ini menjalankan `npm install` dan `npm run build` di `frontend\`, menyalin `frontend\dist` ke `backend\internal\webdist\dist`, lalu `go build -tags embed_prod` yang menghasilkan `smeditor.exe` di root repo dengan frontend tertanam.
+Skrip ini menjalankan `npm ci` dan `npm run build` di `frontend\` (`npm ci` memasang persis versi di `package-lock.json` tanpa mengubah file itu; jika gagal karena `package.json` dan lock file tidak sinkron, jalankan `npm install` sekali di `frontend\` lalu commit lock file-nya), menyalin `frontend\dist` ke `backend\internal\webdist\dist`, lalu `go build -tags embed_prod` yang menghasilkan `smeditor.exe` di root repo dengan frontend tertanam.
 
 Jika `smeditor.exe` sedang berjalan, skrip memindahkannya ke `smeditor.exe.old` (Windows mengizinkan mengganti nama .exe yang sedang jalan, tapi tidak menimpanya) lalu menulis `smeditor.exe` baru. App lama tetap berjalan sampai ditutup; **tutup lalu jalankan ulang `smeditor.exe`** supaya versi baru yang dipakai.
 

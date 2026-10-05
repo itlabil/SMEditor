@@ -23,7 +23,8 @@ function Invoke-Step {
 
 Push-Location $frontend
 try {
-    Invoke-Step 'npm install' { npm install }
+    # npm ci installs exactly what package-lock.json pins and never rewrites it.
+    Invoke-Step 'npm ci' { npm ci }
     Invoke-Step 'npm run build' { npm run build }
 } finally {
     Pop-Location
