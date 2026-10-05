@@ -11,6 +11,10 @@
 *.test
 *.out
 
+# Frontend ter-embed, hasil copy dari frontend/dist saat make build
+/backend/internal/webdist/dist/*
+!/backend/internal/webdist/dist/.gitkeep
+
 # Frontend
 /frontend/node_modules/
 /frontend/dist/

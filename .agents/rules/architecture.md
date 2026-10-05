@@ -22,6 +22,7 @@ backend/
       ffmpeg/       ffmpeg dan ffprobe
       whisper/      pemanggil dan konversi keluaran
     storage/        path folder project, baca tulis file
+    webdist/        embed frontend/dist untuk mode produksi (build tag embed_prod)
 frontend/
   src/
     api/            satu file per modul backend
