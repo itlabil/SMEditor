@@ -12,6 +12,7 @@ import (
 
 	"smeditor/internal/db"
 	"smeditor/internal/httpx"
+	"smeditor/internal/modules/job"
 	"smeditor/internal/modules/project"
 	"smeditor/internal/modules/settings"
 	"smeditor/internal/storage"
@@ -22,7 +23,10 @@ import (
 	"smeditor/internal/webdist"
 )
 
-func NewRouter(conn *sql.DB, st *storage.Storage) *gin.Engine {
+// NewRouter wires every module and starts the job worker. ctx governs the
+// worker's background goroutine, per .agents/skills/sm-job-worker; it
+// should live as long as the server does.
+func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
@@ -35,13 +39,24 @@ func NewRouter(conn *sql.DB, st *storage.Storage) *gin.Engine {
 	settingsSvc := settings.NewService(settingsRepo, ytdlp.Client{}, ffmpeg.Ffmpeg{}, ffmpeg.Ffprobe{}, whisper.Client{})
 	settings.NewHandler(settingsSvc).Register(api)
 
+	jobRepo := job.NewRepository(conn)
+	jobHub := job.NewHub()
+	jobWorker := job.NewWorker(jobRepo, jobHub, nil)
+	jobSvc := job.NewService(jobRepo, jobWorker)
+	job.NewHandler(jobSvc, jobHub).Register(api)
+
+	if err := jobWorker.RecoverStaleRunning(ctx); err != nil {
+		return nil, err
+	}
+	jobWorker.Start(ctx)
+
 	projectRepo := project.NewRepository(conn)
-	projectSvc := project.NewService(projectRepo, st)
+	projectSvc := project.NewService(projectRepo, st, jobSvc)
 	project.NewHandler(projectSvc).Register(api)
 
 	registerFrontend(r)
 
-	return r
+	return r, nil
 }
 
 // registerFrontend serves the built Vue app in production. In dev, the
@@ -77,12 +92,16 @@ func Run() error {
 	}
 	defer conn.Close()
 
-	if err := db.Migrate(context.Background(), conn); err != nil {
+	ctx := context.Background()
+	if err := db.Migrate(ctx, conn); err != nil {
 		return err
 	}
 
 	st := storage.New(cfg.DataPath())
-	r := NewRouter(conn, st)
+	r, err := NewRouter(ctx, conn, st)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:    "127.0.0.1:" + cfg.Port,

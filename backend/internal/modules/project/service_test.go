@@ -12,7 +12,22 @@ import (
 	"smeditor/internal/storage"
 )
 
+type fakeJobCanceler struct {
+	calledForProject string
+}
+
+func (f *fakeJobCanceler) CancelAllForProject(ctx context.Context, projectID string) error {
+	f.calledForProject = projectID
+	return nil
+}
+
 func newTestService(t *testing.T) *Service {
+	t.Helper()
+	svc, _ := newTestServiceWithJobs(t)
+	return svc
+}
+
+func newTestServiceWithJobs(t *testing.T) (*Service, *fakeJobCanceler) {
 	t.Helper()
 	conn, err := db.Open(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
@@ -25,7 +40,8 @@ func newTestService(t *testing.T) *Service {
 
 	repo := NewRepository(conn)
 	st := storage.New(t.TempDir())
-	return NewService(repo, st)
+	jobs := &fakeJobCanceler{}
+	return NewService(repo, st, jobs), jobs
 }
 
 func validRequest() CreateRequest {
@@ -155,7 +171,7 @@ func TestServiceList_ReturnsCreatedProjects(t *testing.T) {
 }
 
 func TestServiceDelete_RemovesRowAndFolder(t *testing.T) {
-	svc := newTestService(t)
+	svc, jobs := newTestServiceWithJobs(t)
 	ctx := context.Background()
 
 	p, err := svc.Create(ctx, validRequest())
@@ -176,6 +192,9 @@ func TestServiceDelete_RemovesRowAndFolder(t *testing.T) {
 	}
 	if _, err := svc.Get(ctx, p.ID); err == nil {
 		t.Fatal("Get after Delete: want error, got nil")
+	}
+	if jobs.calledForProject != p.ID {
+		t.Errorf("Delete did not cancel jobs for project before removing it: got %q, want %q", jobs.calledForProject, p.ID)
 	}
 }
 

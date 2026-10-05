@@ -11,13 +11,21 @@ import (
 	"smeditor/internal/storage"
 )
 
+// JobCanceler stops every job (running or queued) for a project before its
+// folder is deleted, implemented by the job module and injected from
+// internal/app, per .agents/skills/sm-job-worker.
+type JobCanceler interface {
+	CancelAllForProject(ctx context.Context, projectID string) error
+}
+
 type Service struct {
 	repo    *Repository
 	storage *storage.Storage
+	jobs    JobCanceler
 }
 
-func NewService(repo *Repository, st *storage.Storage) *Service {
-	return &Service{repo: repo, storage: st}
+func NewService(repo *Repository, st *storage.Storage, jobs JobCanceler) *Service {
+	return &Service{repo: repo, storage: st, jobs: jobs}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (*Project, error) {
@@ -82,6 +90,9 @@ func (s *Service) Get(ctx context.Context, id string) (*Project, error) {
 
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if _, err := s.findByID(ctx, id); err != nil {
+		return err
+	}
+	if err := s.jobs.CancelAllForProject(ctx, id); err != nil {
 		return err
 	}
 	if err := s.storage.DeleteProjectDir(id); err != nil {
