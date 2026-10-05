@@ -1,0 +1,28 @@
+# Data app: database, video, transcript
+/data/
+
+# Tool luar dan model Whisper
+/tools/
+
+# Hasil build Go
+/backend/bin/
+/backend/tmp/
+*.exe
+*.test
+*.out
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+
+# Environment dan log
+.env
+.env.*
+!.env.example
+*.log
+
+# Editor dan OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
