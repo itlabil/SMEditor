@@ -5,6 +5,8 @@ import { listProjects, createProject, deleteProject, thumbnailUrl } from '../api
 import { listGameModes } from '../api/promptBlocks'
 import { useNotify } from '../composables/useNotify'
 import { useConfirm } from '../composables/useConfirm'
+import { statusLabel, gameName } from '../lib/labels'
+import AppLayout from '../components/AppLayout.vue'
 
 const { success, error } = useNotify()
 const { confirm } = useConfirm()
@@ -84,13 +86,13 @@ onMounted(load)
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 bg-slate-950 p-8 text-slate-100">
+  <AppLayout wide>
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-semibold">Project</h1>
       <RouterLink to="/settings" class="text-sm text-emerald-400 underline">Pengaturan</RouterLink>
     </div>
 
-    <form class="flex flex-col gap-3 rounded border border-slate-800 p-4" @submit.prevent="create">
+    <form class="flex max-w-xl flex-col gap-3 rounded border border-slate-800 p-4" @submit.prevent="create">
       <h2 class="text-lg font-semibold">Project baru</h2>
       <label class="flex flex-col gap-1">
         <span class="text-sm text-slate-400">Nama project</span>
@@ -120,7 +122,7 @@ onMounted(load)
       <button
         type="submit"
         :disabled="creating"
-        class="rounded bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
+        class="self-start rounded bg-emerald-600 px-4 py-2 font-medium disabled:opacity-50"
       >
         {{ creating ? 'Membuat...' : 'Buat project' }}
       </button>
@@ -130,30 +132,28 @@ onMounted(load)
       <h2 class="text-lg font-semibold">Daftar project</h2>
       <p v-if="loading" class="text-slate-400">Memuat...</p>
       <p v-else-if="!projects.length" class="text-slate-400">Belum ada project.</p>
-      <ul v-else class="flex flex-col gap-2">
-        <li
-          v-for="p in projects"
-          :key="p.id"
-          class="flex items-center gap-4 rounded bg-slate-900 px-3 py-2"
-        >
+      <ul v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <li v-for="p in projects" :key="p.id" class="flex flex-col gap-2 rounded bg-slate-900 p-3">
           <img
             v-if="p.has_thumbnail"
             :src="thumbnailUrl(p.id)"
             alt=""
-            class="h-12 w-20 flex-none rounded object-cover"
+            class="aspect-video w-full rounded object-cover"
           />
-          <div v-else class="h-12 w-20 flex-none rounded bg-slate-800"></div>
+          <div v-else class="aspect-video w-full rounded bg-slate-800"></div>
 
-          <RouterLink :to="`/projects/${p.id}`" class="flex-1 min-w-0">
+          <RouterLink :to="`/projects/${p.id}`" class="min-w-0 flex-1">
             <p class="truncate font-medium">{{ p.name }}</p>
-            <p class="text-xs text-slate-400">
-              {{ p.game_code }} · {{ p.status }} · {{ formatDuration(p.duration_sec) }} · {{ formatSize(p.size_bytes) }}
+            <p class="truncate text-xs text-slate-400">
+              {{ gameName(gameModes, p.game_code) }} ·
+              <span :class="statusLabel(p.status).color">{{ statusLabel(p.status).text }}</span>
+              · {{ formatDuration(p.duration_sec) }} · {{ formatSize(p.size_bytes) }}
             </p>
           </RouterLink>
 
-          <button class="rounded bg-rose-700 px-3 py-1 text-sm" @click="remove(p)">Hapus</button>
+          <button class="self-start rounded bg-rose-700 px-3 py-1 text-sm" @click="remove(p)">Hapus</button>
         </li>
       </ul>
     </section>
-  </main>
+  </AppLayout>
 </template>

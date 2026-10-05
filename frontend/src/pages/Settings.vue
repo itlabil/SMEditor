@@ -4,6 +4,7 @@ import { getSettings, updateSettings, checkTools } from '../api/settings'
 import { getPromptBlock, updatePromptBlock, resetPromptBlock } from '../api/promptBlocks'
 import { useNotify } from '../composables/useNotify'
 import { useConfirm } from '../composables/useConfirm'
+import AppLayout from '../components/AppLayout.vue'
 
 const { success, error } = useNotify()
 const { confirm } = useConfirm()
@@ -118,7 +119,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 bg-slate-950 p-8 text-slate-100">
+  <AppLayout>
     <h1 class="text-2xl font-semibold">Pengaturan</h1>
 
     <form v-if="!loading" class="flex flex-col gap-4" @submit.prevent="save">
@@ -183,7 +184,7 @@ onMounted(() => {
             <p class="font-mono text-xs text-slate-500">{{ r.path }}</p>
           </div>
           <span :class="r.found ? 'text-emerald-400' : 'text-rose-400'">
-            {{ r.found ? `ditemukan (${r.version || 'versi tidak terbaca'})` : 'tidak ditemukan' }}
+            {{ r.found ? (r.version ? `ditemukan (${r.version})` : 'ditemukan') : 'tidak ditemukan' }}
           </span>
         </li>
       </ul>
@@ -225,5 +226,5 @@ onMounted(() => {
         </div>
       </template>
     </section>
-  </main>
+  </AppLayout>
 </template>

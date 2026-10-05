@@ -2,16 +2,20 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getProject, getPrompt, openFolder, retryDownload, retryTranscribe, transcriptUrl } from '../api/projects'
+import { listGameModes } from '../api/promptBlocks'
 import { saveHighlight, getHighlight, deleteHighlight, narasiUrl } from '../api/highlight'
 import { useNotify } from '../composables/useNotify'
 import { useConfirm } from '../composables/useConfirm'
 import { useSSE } from '../composables/useSSE'
+import { statusLabel, gameName } from '../lib/labels'
+import AppLayout from '../components/AppLayout.vue'
 
 const route = useRoute()
 const { success, error } = useNotify()
 const { confirm } = useConfirm()
 
 const project = ref(null)
+const gameModes = ref([])
 const loading = ref(true)
 const retrying = ref(false)
 const retryingTranscript = ref(false)
@@ -29,19 +33,24 @@ const savedHighlight = ref(null)
 const pastDownload = computed(() =>
   ['transcript', 'gagal_transcript', 'menunggu_highlight', 'siap_premiere'].includes(project.value?.status),
 )
-const canHighlight = computed(() => ['menunggu_highlight', 'siap_premiere'].includes(project.value?.status))
+// Transcript (and therefore highlight) is only available once the
+// pipeline reaches these two statuses; everything that depends on
+// transcript.txt/json actually existing on disk is gated on this.
+const hasTranscript = computed(() => ['menunggu_highlight', 'siap_premiere'].includes(project.value?.status))
 
 async function load() {
   loading.value = true
   try {
-    project.value = await getProject(route.params.id)
+    const [p, g] = await Promise.all([getProject(route.params.id), listGameModes()])
+    project.value = p
+    gameModes.value = g
     if (project.value.transcript_lang) {
       transcriptLang.value = project.value.transcript_lang
     }
     if (pastDownload.value) {
       promptText.value = (await getPrompt(route.params.id)).prompt
     }
-    if (canHighlight.value) {
+    if (hasTranscript.value) {
       await loadHighlight()
     }
   } catch (err) {
@@ -169,7 +178,7 @@ onUnmounted(() => sse.close())
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-screen max-w-2xl flex-col gap-4 bg-slate-950 p-8 text-slate-100">
+  <AppLayout>
     <RouterLink to="/" class="text-sm text-emerald-400 underline">&larr; Kembali ke daftar project</RouterLink>
 
     <p v-if="loading" class="text-slate-400">Memuat...</p>
@@ -186,9 +195,9 @@ onUnmounted(() => sse.close())
       </div>
       <dl class="grid grid-cols-2 gap-2 text-sm">
         <dt class="text-slate-400">Game</dt>
-        <dd>{{ project.game_code }}</dd>
+        <dd>{{ gameName(gameModes, project.game_code) }}</dd>
         <dt class="text-slate-400">Status</dt>
-        <dd>{{ project.status }}</dd>
+        <dd :class="statusLabel(project.status).color">{{ statusLabel(project.status).text }}</dd>
         <dt class="text-slate-400">URL YouTube</dt>
         <dd class="truncate">{{ project.youtube_url }}</dd>
         <dt class="text-slate-400">Tim</dt>
@@ -244,13 +253,13 @@ onUnmounted(() => sse.close())
           </button>
         </div>
 
-        <div class="flex gap-3 text-sm">
+        <div v-if="hasTranscript" class="flex gap-3 text-sm">
           <a :href="transcriptUrl(project.id, 'txt')" class="text-emerald-400 underline">Unduh transcript.txt</a>
           <a :href="transcriptUrl(project.id, 'json')" class="text-emerald-400 underline">Unduh transcript.json</a>
         </div>
       </section>
 
-      <section v-if="pastDownload && promptText" class="flex flex-col gap-2 border-t border-slate-800 pt-4">
+      <section v-if="hasTranscript && promptText" class="flex flex-col gap-2 border-t border-slate-800 pt-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold">Prompt</h2>
           <button class="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium" @click="copyPrompt">Salin prompt</button>
@@ -263,7 +272,7 @@ onUnmounted(() => sse.close())
         ></textarea>
       </section>
 
-      <section v-if="canHighlight" class="flex flex-col gap-3 border-t border-slate-800 pt-4">
+      <section v-if="hasTranscript" class="flex flex-col gap-3 border-t border-slate-800 pt-4">
         <h2 class="text-lg font-semibold">Highlight</h2>
 
         <template v-if="savedHighlight">
@@ -312,5 +321,5 @@ onUnmounted(() => sse.close())
         </template>
       </section>
     </template>
-  </main>
+  </AppLayout>
 </template>

@@ -14,16 +14,24 @@ type ToolClient interface {
 	Check(ctx context.Context, path string) (resolvedPath string, found bool, version string)
 }
 
-type Service struct {
-	repo    *Repository
-	ytdlp   ToolClient
-	ffmpeg  ToolClient
-	ffprobe ToolClient
-	whisper ToolClient
+// ModelClient checks whether a configured model file exists. Unlike
+// ToolClient, it never runs anything: a model file has no --version to
+// call, so there is no "version" to report.
+type ModelClient interface {
+	CheckModel(ctx context.Context, path string) (resolvedPath string, found bool, version string)
 }
 
-func NewService(repo *Repository, ytdlp, ffmpeg, ffprobe, whisper ToolClient) *Service {
-	return &Service{repo: repo, ytdlp: ytdlp, ffmpeg: ffmpeg, ffprobe: ffprobe, whisper: whisper}
+type Service struct {
+	repo         *Repository
+	ytdlp        ToolClient
+	ffmpeg       ToolClient
+	ffprobe      ToolClient
+	whisper      ToolClient
+	whisperModel ModelClient
+}
+
+func NewService(repo *Repository, ytdlp, ffmpeg, ffprobe, whisper ToolClient, whisperModel ModelClient) *Service {
+	return &Service{repo: repo, ytdlp: ytdlp, ffmpeg: ffmpeg, ffprobe: ffprobe, whisper: whisper, whisperModel: whisperModel}
 }
 
 // Get returns every known setting key, filling in the default value for
@@ -66,8 +74,8 @@ func (s *Service) Update(ctx context.Context, values map[string]string) (map[str
 	return s.Get(ctx)
 }
 
-// Check probes yt-dlp, ffmpeg, ffprobe, and whisper using the currently
-// saved (or default) paths.
+// Check probes yt-dlp, ffmpeg, ffprobe, whisper, and the whisper model
+// file using the currently saved (or default) paths.
 func (s *Service) Check(ctx context.Context) ([]CheckResult, error) {
 	current, err := s.Get(ctx)
 	if err != nil {
@@ -85,10 +93,14 @@ func (s *Service) Check(ctx context.Context) ([]CheckResult, error) {
 		{"whisper", KeyWhisperPath, s.whisper},
 	}
 
-	results := make([]CheckResult, 0, len(tools))
+	results := make([]CheckResult, 0, len(tools)+1)
 	for _, t := range tools {
 		path, found, version := t.client.Check(ctx, current[t.key])
 		results = append(results, CheckResult{Tool: t.name, Path: path, Found: found, Version: version})
 	}
+
+	modelPath, modelFound, _ := s.whisperModel.CheckModel(ctx, current[KeyWhisperModel])
+	results = append(results, CheckResult{Tool: "model whisper", Path: modelPath, Found: modelFound})
+
 	return results, nil
 }

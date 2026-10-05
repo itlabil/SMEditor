@@ -139,8 +139,41 @@ func TestAssemble_OptionalFieldsDefaultToTidakDiisi(t *testing.T) {
 	if !strings.Contains(got, "Tim: tidak diisi vs tidak diisi") {
 		t.Error("assemble() should default empty tim_a/tim_b to 'tidak diisi'")
 	}
-	if !strings.Contains(got, "highlight: tidak diisi menit") {
-		t.Error("assemble() should default target_durasi 0 to 'tidak diisi'")
+	if strings.Contains(got, "Perkiraan total durasi highlight") {
+		t.Error("assemble() should drop the whole target_durasi line when TargetMinutes is 0, not fill it with 'tidak diisi'")
+	}
+}
+
+func TestAssemble_TargetMinutesLineOmittedWhenZero(t *testing.T) {
+	frame := blockFor(t, "frame")
+	block := blockFor(t, "umum")
+	gm := umumGameMode()
+	in := fullInput()
+	in.GameCode = gm.Code
+	in.TargetMinutes = 0
+
+	got := assemble(frame, block, gm, in)
+
+	if m := anyPlaceholder.FindString(got); m != "" {
+		t.Errorf("assemble() left an unresolved placeholder %q", m)
+	}
+	if strings.Contains(got, "Perkiraan total durasi highlight") {
+		t.Errorf("assemble() = %q, want the target_durasi line removed entirely when TargetMinutes is 0", got)
+	}
+}
+
+func TestAssemble_TargetMinutesLineShownWhenSet(t *testing.T) {
+	frame := blockFor(t, "frame")
+	block := blockFor(t, "umum")
+	gm := umumGameMode()
+	in := fullInput()
+	in.GameCode = gm.Code
+	in.TargetMinutes = 15
+
+	got := assemble(frame, block, gm, in)
+
+	if !strings.Contains(got, "Perkiraan total durasi highlight: 15 menit") {
+		t.Errorf("assemble() = %q, want the target_durasi line with value 15", got)
 	}
 }
 

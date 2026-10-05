@@ -38,7 +38,7 @@ func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Eng
 	})
 
 	settingsRepo := settings.NewRepository(conn)
-	settingsSvc := settings.NewService(settingsRepo, ytdlp.Client{}, ffmpeg.Ffmpeg{}, ffmpeg.Ffprobe{}, whisper.Client{})
+	settingsSvc := settings.NewService(settingsRepo, ytdlp.Client{}, ffmpeg.Ffmpeg{}, ffmpeg.Ffprobe{}, whisper.Client{}, whisper.Client{})
 	settings.NewHandler(settingsSvc).Register(api)
 
 	promptRepo := prompt.NewRepository(conn)

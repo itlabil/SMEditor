@@ -34,11 +34,34 @@ func assemble(frame, block Block, gm GameMode, in AssembleInput) string {
 	vars["durasi"] = formatHMS(in.DurationSec)
 	vars["tim_a"] = orDefault(in.TeamA)
 	vars["tim_b"] = orDefault(in.TeamB)
-	vars["target_durasi"] = targetDurasiText(in.TargetMinutes)
 	vars["blok_tugas"] = blockText
 	vars["daftar_kategori"] = strings.Join(block.Categories, ", ")
 
-	return substitute(frame.Body, vars)
+	// target_durasi is optional: PRD asks for the whole line to disappear
+	// when it's not set, not just the placeholder (unlike every other
+	// optional field, which falls back to "tidak diisi" in place).
+	frameBody := frame.Body
+	if in.TargetMinutes > 0 {
+		vars["target_durasi"] = strconv.Itoa(in.TargetMinutes)
+	} else {
+		frameBody = removeLineContaining(frameBody, "{target_durasi}")
+	}
+
+	return substitute(frameBody, vars)
+}
+
+// removeLineContaining drops every line of text that contains token,
+// joining what remains back with "\n".
+func removeLineContaining(text, token string) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.Contains(line, token) {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
 }
 
 func substitute(text string, vars map[string]string) string {
@@ -54,13 +77,6 @@ func orDefault(s string) string {
 		return "tidak diisi"
 	}
 	return s
-}
-
-func targetDurasiText(minutes int) string {
-	if minutes <= 0 {
-		return "tidak diisi"
-	}
-	return strconv.Itoa(minutes)
 }
 
 func formatHMS(sec float64) string {

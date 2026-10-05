@@ -19,7 +19,17 @@ func (f *fakeToolClient) Check(ctx context.Context, path string) (string, bool, 
 	return path, f.found, f.version
 }
 
-func newTestService(t *testing.T) (*Service, *fakeToolClient, *fakeToolClient, *fakeToolClient, *fakeToolClient) {
+type fakeModelClient struct {
+	path  string
+	found bool
+}
+
+func (f *fakeModelClient) CheckModel(ctx context.Context, path string) (string, bool, string) {
+	f.path = path
+	return path, f.found, ""
+}
+
+func newTestService(t *testing.T) (*Service, *fakeToolClient, *fakeToolClient, *fakeToolClient, *fakeToolClient, *fakeModelClient) {
 	t.Helper()
 	conn, err := db.Open(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
@@ -35,12 +45,13 @@ func newTestService(t *testing.T) (*Service, *fakeToolClient, *fakeToolClient, *
 	ffmpeg := &fakeToolClient{found: true, version: "6.1.1"}
 	ffprobe := &fakeToolClient{found: true, version: "6.1.1"}
 	whisper := &fakeToolClient{found: false}
+	whisperModel := &fakeModelClient{found: true}
 
-	return NewService(repo, ytdlp, ffmpeg, ffprobe, whisper), ytdlp, ffmpeg, ffprobe, whisper
+	return NewService(repo, ytdlp, ffmpeg, ffprobe, whisper, whisperModel), ytdlp, ffmpeg, ffprobe, whisper, whisperModel
 }
 
 func TestServiceGetReturnsDefaults(t *testing.T) {
-	svc, _, _, _, _ := newTestService(t)
+	svc, _, _, _, _, _ := newTestService(t)
 
 	got, err := svc.Get(context.Background())
 	if err != nil {
@@ -54,7 +65,7 @@ func TestServiceGetReturnsDefaults(t *testing.T) {
 }
 
 func TestServiceUpdateOverridesDefaultAndPersists(t *testing.T) {
-	svc, _, _, _, _ := newTestService(t)
+	svc, _, _, _, _, _ := newTestService(t)
 	ctx := context.Background()
 
 	got, err := svc.Update(ctx, map[string]string{KeyYtdlpPath: "/opt/yt-dlp"})
@@ -79,7 +90,7 @@ func TestServiceUpdateOverridesDefaultAndPersists(t *testing.T) {
 }
 
 func TestServiceUpdateRejectsUnknownKey(t *testing.T) {
-	svc, _, _, _, _ := newTestService(t)
+	svc, _, _, _, _, _ := newTestService(t)
 
 	_, err := svc.Update(context.Background(), map[string]string{"not_a_real_key": "x"})
 	if err == nil {
@@ -88,7 +99,7 @@ func TestServiceUpdateRejectsUnknownKey(t *testing.T) {
 }
 
 func TestServiceUpdateRejectsInvalidWhisperDevice(t *testing.T) {
-	svc, _, _, _, _ := newTestService(t)
+	svc, _, _, _, _, _ := newTestService(t)
 
 	_, err := svc.Update(context.Background(), map[string]string{KeyWhisperDevice: "tpu"})
 	if err == nil {
@@ -97,14 +108,14 @@ func TestServiceUpdateRejectsInvalidWhisperDevice(t *testing.T) {
 }
 
 func TestServiceCheckReportsEachTool(t *testing.T) {
-	svc, ytdlp, ffmpeg, ffprobe, whisper := newTestService(t)
+	svc, ytdlp, ffmpeg, ffprobe, whisper, whisperModel := newTestService(t)
 
 	results, err := svc.Check(context.Background())
 	if err != nil {
 		t.Fatalf("Check: %v", err)
 	}
-	if len(results) != 4 {
-		t.Fatalf("Check() returned %d results, want 4", len(results))
+	if len(results) != 5 {
+		t.Fatalf("Check() returned %d results, want 5", len(results))
 	}
 
 	byTool := map[string]CheckResult{}
@@ -126,5 +137,34 @@ func TestServiceCheckReportsEachTool(t *testing.T) {
 	}
 	if whisper.path != defaults[KeyWhisperPath] {
 		t.Errorf("whisper client received path %q, want default %q", whisper.path, defaults[KeyWhisperPath])
+	}
+
+	modelResult, ok := byTool["model whisper"]
+	if !ok {
+		t.Fatal(`Check() has no "model whisper" result`)
+	}
+	if !modelResult.Found {
+		t.Errorf("model whisper result = %+v, want found=true", modelResult)
+	}
+	if whisperModel.path != defaults[KeyWhisperModel] {
+		t.Errorf("whisper model client received path %q, want default %q", whisperModel.path, defaults[KeyWhisperModel])
+	}
+}
+
+func TestServiceCheckReportsModelNotFound(t *testing.T) {
+	svc, _, _, _, _, whisperModel := newTestService(t)
+	whisperModel.found = false
+
+	results, err := svc.Check(context.Background())
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+
+	byTool := map[string]CheckResult{}
+	for _, r := range results {
+		byTool[r.Tool] = r
+	}
+	if byTool["model whisper"].Found {
+		t.Errorf(`model whisper result = %+v, want found=false`, byTool["model whisper"])
 	}
 }
