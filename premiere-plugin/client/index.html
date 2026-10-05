@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>SMEditor Highlight</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>SMEditor Highlight</h1>
+    <p id="host-status" class="muted">Memeriksa sambungan ke Premiere...</p>
+  </header>
+
+  <section>
+    <h2>1. File highlight</h2>
+    <button id="btn-pick" type="button">Pilih highlight.json</button>
+    <dl>
+      <dt>Highlight</dt>
+      <dd id="json-path" class="path">belum dipilih</dd>
+      <dt>Video</dt>
+      <dd id="video-path" class="path">belum dipilih</dd>
+    </dl>
+    <button id="btn-pick-video" type="button" class="secondary" hidden>Pilih video secara manual</button>
+  </section>
+
+  <section id="summary" hidden>
+    <h2>2. Ringkasan</h2>
+    <p id="summary-line"></p>
+    <p id="ringkasan" class="muted"></p>
+    <div id="problems" hidden>
+      <h3>Segmen yang dilewati</h3>
+      <ul id="problem-list"></ul>
+    </div>
+    <h3>Segmen yang akan dipotong</h3>
+    <ol id="segment-list"></ol>
+  </section>
+
+  <section id="build" hidden>
+    <h2>3. Buat sequence</h2>
+    <label>Nama sequence
+      <input id="seq-name" type="text">
+    </label>
+    <div class="row">
+      <label>Tambahan waktu (detik)
+        <input id="pad" type="number" min="0" max="10" step="0.5" value="1">
+      </label>
+      <label>Jeda antar potongan (detik)
+        <input id="gap" type="number" min="0" max="10" step="0.5" value="1">
+      </label>
+    </div>
+    <button id="btn-build" type="button">Buat Sequence</button>
+    <div id="report" hidden>
+      <h3>Laporan</h3>
+      <ul id="report-list"></ul>
+    </div>
+  </section>
+
+  <p id="message" class="message" hidden></p>
+
+  <script src="main.js"></script>
+</body>
+</html>
