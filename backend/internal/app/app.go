@@ -65,13 +65,14 @@ func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Eng
 	jobWorker.Register(project.NewDownloadRunner(projectRepo, st, settingsSvc, ytdlpClient, ffprobeClient, ffmpegClient, jobSvc))
 	jobWorker.Register(project.NewConvertRunner(projectRepo, st, settingsSvc, ffmpegClient, ffprobeClient))
 	jobWorker.Register(project.NewTranscribeRunner(projectRepo, st, settingsSvc, ffmpegClient, whisperClient))
+	jobWorker.Register(project.NewExportRunner(projectRepo, st))
 
 	if err := jobWorker.RecoverStaleRunning(ctx); err != nil {
 		return nil, err
 	}
 	jobWorker.Start(ctx)
 
-	projectSvc := project.NewService(projectRepo, st, jobSvc, promptSvc, tools.Opener{})
+	projectSvc := project.NewService(projectRepo, st, jobSvc, promptSvc, tools.Opener{}, settingsSvc)
 	project.NewHandler(projectSvc).Register(api)
 
 	highlightSvc := highlight.NewService(st, projectSvc, projectSvc, promptSvc)

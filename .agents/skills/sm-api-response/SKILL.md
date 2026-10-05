@@ -94,6 +94,9 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `highlight_invalid` | 422 | JSON highlight melanggar aturan |
 | `tool_not_found` | 409 | yt-dlp, ffmpeg, atau Whisper tidak ditemukan |
 | `open_folder_failed` | 409 | File manager gagal dijalankan untuk membuka folder project (`details.path` tetap berisi path absolut) |
+| `export_not_ready` | 409 | Project belum berstatus `siap_premiere`, belum bisa disalin ke folder |
+| `export_dest_invalid` | 422 | Folder tujuan "Salin ke folder" kosong, bukan path absolut, tidak ada, atau tidak bisa ditulis |
+| `export_dir_exists` | 409 | Subfolder tujuan sudah ada dan `overwrite` belum dikirim `true` (`details.target_dir` berisi path yang akan ditimpa) |
 | `thumbnail_not_found` | 404 | Thumbnail project belum tersedia |
 | `video_not_found` | 404 | Video project belum tersedia |
 | `invalid_format` | 400 | Parameter `format` bukan `txt` atau `json` |

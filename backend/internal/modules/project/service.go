@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"smeditor/internal/idgen"
 	"smeditor/internal/modules/job"
 	"smeditor/internal/modules/prompt"
+	"smeditor/internal/modules/settings"
 	"smeditor/internal/storage"
 )
 
@@ -25,6 +28,13 @@ type JobEnqueuer interface {
 	Enqueue(ctx context.Context, projectID, jobType string) (*job.Job, error)
 }
 
+// JobPayloadEnqueuer is JobEnqueuer for a job type that needs one extra
+// piece of data. Only ExportToFolder uses it (the destination folder for
+// job.TypeExport); download/convert/transcribe never do.
+type JobPayloadEnqueuer interface {
+	EnqueueWithPayload(ctx context.Context, projectID, jobType, payload string) (*job.Job, error)
+}
+
 // JobChecker reports whether a project already has a job in flight, so a
 // retry can be rejected instead of racing the existing one.
 type JobChecker interface {
@@ -36,6 +46,7 @@ type JobChecker interface {
 type Jobs interface {
 	JobCanceler
 	JobEnqueuer
+	JobPayloadEnqueuer
 	JobChecker
 }
 
@@ -51,16 +62,31 @@ type FolderOpener interface {
 	OpenFolder(ctx context.Context, path string) error
 }
 
-type Service struct {
-	repo    *Repository
-	storage *storage.Storage
-	jobs    Jobs
-	prompt  PromptAssembler
-	opener  FolderOpener
+// SettingsWriter persists the destination folder the user last typed
+// into "Salin ke folder" (settings.KeyExportDir), so it becomes the next
+// default, per docs/prd.md. Implemented by settings.Service.
+type SettingsWriter interface {
+	Update(ctx context.Context, values map[string]string) (map[string]string, error)
 }
 
-func NewService(repo *Repository, st *storage.Storage, jobs Jobs, promptAssembler PromptAssembler, opener FolderOpener) *Service {
-	return &Service{repo: repo, storage: st, jobs: jobs, prompt: promptAssembler, opener: opener}
+type Service struct {
+	repo           *Repository
+	storage        *storage.Storage
+	jobs           Jobs
+	prompt         PromptAssembler
+	opener         FolderOpener
+	settingsWriter SettingsWriter
+}
+
+func NewService(
+	repo *Repository,
+	st *storage.Storage,
+	jobs Jobs,
+	promptAssembler PromptAssembler,
+	opener FolderOpener,
+	settingsWriter SettingsWriter,
+) *Service {
+	return &Service{repo: repo, storage: st, jobs: jobs, prompt: promptAssembler, opener: opener, settingsWriter: settingsWriter}
 }
 
 // OpenFolder opens a project's data folder in the OS's file manager, so
@@ -82,6 +108,76 @@ func (s *Service) OpenFolder(ctx context.Context, id string) (string, error) {
 		return dir, appErr
 	}
 	return dir, nil
+}
+
+// ExportToFolder copies a project's finished output (source video,
+// highlight.json, narasi.txt) into a sanitized subfolder of req.DestDir,
+// so the project in data/ can be deleted afterwards without making
+// Premiere's media offline, per docs/prd.md ("Salin ke folder"). The
+// actual copy runs as a job.TypeExport job (progress + cancel, per
+// .agents/skills/sm-job-worker); this only validates and queues it.
+func (s *Service) ExportToFolder(ctx context.Context, id string, req ExportRequest) (*ExportResult, error) {
+	p, err := s.findByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if p.Status != StatusSiapPremiere {
+		return nil, httpx.ErrConflict("export_not_ready", "Project belum siap disalin; validasi highlight terlebih dahulu")
+	}
+
+	destDir := strings.TrimSpace(req.DestDir)
+	if !ValidExportDest(destDir) {
+		return nil, httpx.ErrUnprocessable("export_dest_invalid", "Folder tujuan wajib diisi dengan path absolut")
+	}
+	if info, statErr := os.Stat(destDir); statErr != nil || !info.IsDir() {
+		return nil, httpx.ErrUnprocessable("export_dest_invalid", "Folder tujuan tidak ditemukan atau bukan folder")
+	}
+	if !isDirWritable(destDir) {
+		return nil, httpx.ErrUnprocessable("export_dest_invalid", "Folder tujuan tidak bisa ditulis")
+	}
+
+	active, err := s.jobs.HasActiveJob(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if active {
+		return nil, httpx.ErrConflict("job_running", "Masih ada job berjalan untuk project ini")
+	}
+
+	targetDir := filepath.Join(destDir, SanitizeFolderName(p.Name))
+	if _, statErr := os.Stat(targetDir); statErr == nil && !req.Overwrite {
+		appErr := httpx.ErrConflict("export_dir_exists", "Folder tujuan sudah ada. Timpa isinya?")
+		appErr.Details = map[string]string{"target_dir": targetDir}
+		return nil, appErr
+	}
+
+	// Remembered regardless of Overwrite, so the next export already
+	// defaults to a destDir that is known to exist and be writable.
+	if _, err := s.settingsWriter.Update(ctx, map[string]string{settings.KeyExportDir: destDir}); err != nil {
+		return nil, err
+	}
+
+	j, err := s.jobs.EnqueueWithPayload(ctx, id, job.TypeExport, targetDir)
+	if err != nil {
+		return nil, err
+	}
+	return &ExportResult{JobID: j.ID, TargetDir: targetDir}, nil
+}
+
+// isDirWritable reports whether dir can actually be written to, by
+// attempting (and immediately removing) a throwaway temp file. A plain
+// permission-bit check is not reliable enough across Windows and Linux
+// (ACLs, read-only filesystems), so this performs the real operation
+// instead of guessing from mode bits.
+func isDirWritable(dir string) bool {
+	f, err := os.CreateTemp(dir, ".smeditor_write_test_*")
+	if err != nil {
+		return false
+	}
+	name := f.Name()
+	f.Close()
+	os.Remove(name)
+	return true
 }
 
 // SetHighlightSaved marks a project siap_premiere with has_highlight=1,

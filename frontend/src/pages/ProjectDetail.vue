@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { getProject, getPrompt, openFolder, retryDownload, retryTranscribe, transcriptUrl, videoUrl } from '../api/projects'
+import { getProject, getPrompt, openFolder, exportToFolder, retryDownload, retryTranscribe, transcriptUrl, videoUrl } from '../api/projects'
 import { listGameModes } from '../api/promptBlocks'
 import { saveHighlight, getHighlight, deleteHighlight, narasiUrl } from '../api/highlight'
 import { cancelJob } from '../api/jobs'
+import { getSettings } from '../api/settings'
 import { useNotify } from '../composables/useNotify'
 import { useConfirm } from '../composables/useConfirm'
 import { useSSE } from '../composables/useSSE'
@@ -26,6 +27,10 @@ const job = ref(null)
 const promptText = ref('')
 const openingFolder = ref(false)
 const folderPath = ref('')
+const exportDestDir = ref('')
+const exporting = ref(false)
+const exportResultPath = ref('')
+let pendingExportTarget = ''
 
 const highlightBody = ref('')
 const highlightErrors = ref([])
@@ -133,12 +138,35 @@ async function openProjectFolder() {
   }
 }
 
-async function copyFolderPath() {
+async function copyText(text) {
   try {
-    await navigator.clipboard.writeText(folderPath.value)
+    await navigator.clipboard.writeText(text)
     success('Path disalin')
   } catch (err) {
     error('Gagal menyalin path')
+  }
+}
+
+async function startExport(overwrite = false) {
+  exporting.value = true
+  try {
+    const res = await exportToFolder(route.params.id, exportDestDir.value, overwrite)
+    pendingExportTarget = res.target_dir
+    exportResultPath.value = ''
+    success('Menyalin ke folder dimulai')
+  } catch (err) {
+    if (err.code === 'export_dir_exists') {
+      exporting.value = false
+      const ok = await confirm({
+        title: 'Folder tujuan sudah ada',
+        text: `${err.details?.target_dir || 'Folder tujuan'} sudah ada. Timpa isinya?`,
+      })
+      if (ok) await startExport(true)
+      return
+    }
+    error(err.message)
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -249,15 +277,38 @@ function onJobEvent(ev) {
     job.value = { id: ev.job_id, type: ev.job_type, progress: ev.progress, message: ev.message }
     return
   }
+  job.value = null
+  // export never changes the project's status (see job_sync.go), so
+  // there is nothing to reload; just report the outcome directly.
+  if (ev.job_type === 'export') {
+    if (ev.type === 'done') {
+      exportResultPath.value = pendingExportTarget
+      success('Selesai disalin ke folder')
+    } else if (ev.type === 'failed') {
+      error(ev.message || 'Salin ke folder gagal')
+    }
+    return
+  }
   // done, failed, canceled: reload from the API instead of guessing the
   // new project status client-side.
-  job.value = null
   load()
 }
 
 const sse = useSSE(route.params.id, onJobEvent)
 
-onMounted(load)
+async function loadExportDefault() {
+  try {
+    const s = await getSettings()
+    exportDestDir.value = s.export_dir || ''
+  } catch (err) {
+    // non-critical prefill; the field just stays empty
+  }
+}
+
+onMounted(() => {
+  load()
+  loadExportDefault()
+})
 onUnmounted(() => sse.close())
 </script>
 
@@ -279,7 +330,7 @@ onUnmounted(() => sse.close())
       </div>
       <div v-if="folderPath" class="flex items-center gap-2 rounded bg-slate-900 px-3 py-2 text-xs">
         <code class="flex-1 overflow-x-auto whitespace-nowrap text-slate-300">{{ folderPath }}</code>
-        <button class="shrink-0 rounded bg-slate-800 px-2 py-1 font-medium" @click="copyFolderPath">Salin</button>
+        <button class="shrink-0 rounded bg-slate-800 px-2 py-1 font-medium" @click="copyText(folderPath)">Salin</button>
       </div>
       <dl class="grid grid-cols-2 gap-2 text-sm">
         <dt class="text-slate-400">Game</dt>
@@ -435,6 +486,40 @@ onUnmounted(() => sse.close())
             <li v-for="(e, i) in highlightErrors" :key="i">Segmen {{ e.segmen || '-' }} ({{ e.field }}): {{ e.message }}</li>
           </ul>
         </template>
+      </section>
+
+      <section v-if="hasTranscript" class="flex flex-col gap-3 border-t border-slate-800 pt-4">
+        <h2 class="text-lg font-semibold">Salin ke folder</h2>
+        <p class="text-sm text-slate-400">
+          Menyalin video, highlight.json, dan narasi.txt ke folder kerja Premiere, supaya project ini boleh dihapus
+          tanpa membuat media offline.
+        </p>
+        <label class="flex flex-col gap-1">
+          <span class="text-sm text-slate-400">Folder tujuan</span>
+          <input v-model="exportDestDir" class="rounded bg-slate-800 px-3 py-2" placeholder="/path/ke/folder/premiere" />
+        </label>
+        <div>
+          <button
+            v-if="!(job && job.type === 'export')"
+            :disabled="project.status !== 'siap_premiere' || exporting || !!job"
+            class="rounded bg-emerald-600 px-3 py-2 text-sm font-medium disabled:opacity-50"
+            @click="startExport()"
+          >
+            {{ exporting ? 'Memulai...' : 'Salin ke folder' }}
+          </button>
+          <button
+            v-else
+            :disabled="cancellingJob"
+            class="rounded bg-rose-700 px-3 py-2 text-sm font-medium disabled:opacity-50"
+            @click="cancelCurrentJob"
+          >
+            {{ cancellingJob ? 'Membatalkan...' : 'Batalkan' }}
+          </button>
+        </div>
+        <div v-if="exportResultPath" class="flex items-center gap-2 rounded bg-slate-900 px-3 py-2 text-xs">
+          <code class="flex-1 overflow-x-auto whitespace-nowrap text-slate-300">{{ exportResultPath }}</code>
+          <button class="shrink-0 rounded bg-slate-800 px-2 py-1 font-medium" @click="copyText(exportResultPath)">Salin</button>
+        </div>
       </section>
     </template>
   </AppLayout>

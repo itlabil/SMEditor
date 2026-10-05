@@ -23,6 +23,7 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	g.GET("/:id/transcript", h.transcript)
 	g.GET("/:id/prompt", h.prompt)
 	g.POST("/:id/open-folder", h.openFolder)
+	g.POST("/:id/export", h.export)
 }
 
 func (h *Handler) list(c *gin.Context) {
@@ -134,4 +135,18 @@ func (h *Handler) openFolder(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, gin.H{"path": path})
+}
+
+func (h *Handler) export(c *gin.Context) {
+	var req ExportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Fail(c, httpx.ErrBadRequest("invalid_body", "Data yang dikirim tidak valid"))
+		return
+	}
+	result, err := h.svc.ExportToFolder(c.Request.Context(), c.Param("id"), req)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, result)
 }

@@ -43,3 +43,7 @@ export function getPrompt(id) {
 export function openFolder(id) {
   return request('POST', `/projects/${id}/open-folder`)
 }
+
+export function exportToFolder(id, destDir, overwrite) {
+  return request('POST', `/projects/${id}/export`, { dest_dir: destDir, overwrite })
+}

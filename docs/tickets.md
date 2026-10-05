@@ -27,6 +27,7 @@ Kerjakan berurutan, satu tiket per sesi. Sebuah tiket selesai jika semua kriteri
 | SM-11 | Plugin: panel dan baca file | — (Windows) |
 | SM-12 | Plugin: sequence dan potongan | SM-11 |
 | SM-13 | Plugin: marker dan laporan | SM-12 |
+| SM-14 | Salin ke folder | SM-09 |
 
 ---
 
@@ -151,3 +152,17 @@ Kriteria terima:
 - Warna marker berbeda per kategori.
 - Panel menampilkan laporan: jumlah potongan dibuat dan segmen yang dilewati beserta alasannya.
 - Menjalankan ulang membuat sequence baru tanpa mengubah yang lama.
+
+## SM-14 — Salin ke folder
+
+Memindahkan bahan project ke folder kerja Premiere lewat app, supaya project di app boleh dihapus tanpa membuat media offline.
+
+Kriteria terima:
+- Tombol "Salin ke folder" di halaman project hanya aktif saat status `siap_premiere`.
+- Pengguna mengisi path folder tujuan lewat input teks. Nilai terakhir disimpan sebagai setting baru `export_dir` dan menjadi isian default berikutnya.
+- App membuat subfolder bernama project (dibersihkan dari karakter yang tidak sah di Windows dan Linux) di dalam tujuan, lalu menyalin video, `highlight.json`, dan `narasi.txt` ke sana. Field `video` di `highlight.json` hasil salinan harus sama dengan nama file video yang disalin.
+- Penyalinan berjalan sebagai job jenis baru `export` lewat worker, dengan progres dan bisa dibatalkan, mengikuti skill `sm-job-worker`. Job ini tidak mengubah status project.
+- Jika subfolder tujuan sudah ada, minta konfirmasi SweetAlert sebelum menimpa. Jika folder tujuan tidak ada atau tidak bisa ditulis, kembalikan error yang jelas. Salin ke file sementara lalu rename, dan bersihkan file setengah jadi saat batal atau gagal.
+- Setelah selesai, tampilkan path hasil dengan tombol salin.
+- `docs/prd.md`, `docs/flow.md`, `docs/erd.md`, `docs/sequence.md` diperbarui; kode error baru ditambahkan ke skill `sm-api-response`.
+- Unit test untuk pembersihan nama folder dan penolakan path tujuan yang tidak sah.

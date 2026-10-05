@@ -85,7 +85,7 @@ func newTestRepoAndStorage(t *testing.T) (*Repository, *storage.Storage) {
 
 func seedTestProject(t *testing.T, repo *Repository, st *storage.Storage) *Project {
 	t.Helper()
-	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{text: "prompt palsu"}, &fakeFolderOpener{})
+	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{text: "prompt palsu"}, &fakeFolderOpener{}, &fakeSettingsWriter{})
 	p, err := svc.Create(context.Background(), validRequest())
 	if err != nil {
 		t.Fatalf("seed project: %v", err)

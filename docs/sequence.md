@@ -23,6 +23,7 @@ Semua respons API berformat JSON: `{"data": ...}` saat berhasil, `{"error": {"co
 | DELETE | `/api/projects/:id/highlight` | Hapus highlight |
 | GET | `/api/projects/:id/narasi` | Unduh `narasi.txt` |
 | POST | `/api/projects/:id/open-folder` | Buka folder project di file manager |
+| POST | `/api/projects/:id/export` | Salin video, highlight.json, narasi.txt ke folder Premiere (job `export`) |
 | GET | `/api/game-modes` | Daftar mode game |
 | GET, PUT | `/api/prompt-blocks/:code` | Baca dan ubah blok prompt |
 | POST | `/api/prompt-blocks/:code/reset` | Kembalikan blok prompt ke bawaan |
@@ -123,6 +124,51 @@ sequenceDiagram
         API->>DB: project siap_premiere, has_highlight 1
         API-->>FE: 200 daftar segmen
     end
+```
+
+## 3a. Salin ke folder
+
+```mermaid
+sequenceDiagram
+    actor U as Pengguna
+    participant FE as Vue
+    participant API as Go API
+    participant DB as SQLite
+    participant W as Worker
+    participant FS as Folder project
+    participant DEST as Folder tujuan
+
+    U->>FE: Isi folder tujuan, klik Salin ke folder
+    FE->>API: POST /api/projects/:id/export {dest_dir, overwrite}
+    API->>API: Cek status siap_premiere, destDir absolut
+    API->>DEST: Cek folder ada dan bisa ditulis
+    alt Tidak valid
+        API-->>FE: 422 export_dest_invalid
+    else Subfolder tujuan sudah ada dan overwrite=false
+        API-->>FE: 409 export_dir_exists {target_dir}
+        FE-->>U: Konfirmasi SweetAlert, timpa?
+        U->>FE: Ya, timpa
+        FE->>API: POST .../export {dest_dir, overwrite: true}
+    end
+    API->>DB: UPDATE settings export_dir = destDir
+    API->>DB: INSERT jobs (export, queued, payload = target_dir)
+    API-->>FE: 200 {job_id, target_dir}
+    FE->>API: GET /api/projects/:id/events (SSE, sudah berlangganan)
+
+    W->>DB: Ambil job export, job running
+    loop Selama menyalin
+        W->>FS: Baca source.mp4, highlight.json, narasi.txt
+        W->>DEST: Tulis ke *.smeditor-tmp, lalu rename
+        W-->>FE: SSE progress
+    end
+    alt Dibatalkan atau gagal
+        W->>DEST: Hapus file *.smeditor-tmp yang belum selesai
+        W-->>FE: SSE canceled/failed
+    else Selesai
+        W-->>FE: SSE done
+        FE-->>U: Tampilkan target_dir dengan tombol salin
+    end
+    Note over W,DB: Job export tidak mengubah status project.
 ```
 
 ## 4. Hapus project

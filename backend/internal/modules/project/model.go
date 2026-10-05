@@ -46,3 +46,21 @@ type CreateRequest struct {
 	TeamB         string `json:"team_b"`
 	TargetMinutes int    `json:"target_minutes"`
 }
+
+// ExportRequest is the body of POST /api/projects/:id/export ("Salin ke
+// folder"). Overwrite must be true to proceed when TargetDir (see
+// ExportResult) already exists; otherwise the request fails with
+// export_dir_exists so the UI can ask for confirmation first.
+type ExportRequest struct {
+	DestDir   string `json:"dest_dir"`
+	Overwrite bool   `json:"overwrite"`
+}
+
+// ExportResult is what POST /api/projects/:id/export returns once the
+// export job is queued: the job to track over SSE, and the absolute
+// folder (DestDir plus the project's sanitized name) the copy will land
+// in, so the UI can show it once the job finishes.
+type ExportResult struct {
+	JobID     string `json:"job_id"`
+	TargetDir string `json:"target_dir"`
+}

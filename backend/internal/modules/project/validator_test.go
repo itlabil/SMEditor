@@ -31,3 +31,48 @@ func TestIsYoutubeURL(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeFolderName(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain name", "MPL Game 3", "MPL Game 3"},
+		{"windows forbidden chars", `A<B>C:D"E/F\G|H?I*J`, "A_B_C_D_E_F_G_H_I_J"},
+		{"control characters", "Line1\nLine2\tTabbed", "Line1_Line2_Tabbed"},
+		{"trailing dot and space", "Final Boss. ", "Final Boss"},
+		{"leading dot and space", " .Hidden", "Hidden"},
+		{"only forbidden characters", `///***`, "______"},
+		{"only whitespace", "   ", "project"},
+		{"empty", "", "project"},
+		{"unicode preserved", "Mabar Mobile Legends 五", "Mabar Mobile Legends 五"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := SanitizeFolderName(tc.in); got != tc.want {
+				t.Errorf("SanitizeFolderName(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidExportDest(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"empty", "", false},
+		{"relative", "data/projects", false},
+		{"relative with dots", "../outside", false},
+		{"unix absolute", "/mnt/d/Premiere/MyProject", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ValidExportDest(tc.path); got != tc.want {
+				t.Errorf("ValidExportDest(%q) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}

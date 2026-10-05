@@ -86,6 +86,15 @@ Status project di app web: `baru`, `mengunduh`, `transcript`, `menunggu highligh
 - Script narasi dibuat dari JSON yang sama dan disimpan sebagai `narasi.txt`, berurutan per segmen.
 - Tombol buka folder project memudahkan menyalin video dan file highlight ke Premiere.
 
+### Salin ke folder
+
+- Tombol hanya aktif saat status `siap_premiere`.
+- Pengguna mengisi path folder tujuan lewat input teks; nilai terakhir disimpan sebagai setting `export_dir` dan menjadi isian default berikutnya.
+- App membuat subfolder bernama project (dibersihkan dari karakter yang tidak sah di Windows dan Linux) di dalam tujuan, lalu menyalin `source.mp4`, `highlight.json`, dan `narasi.txt` ke sana. Field `video` di `highlight.json` hasil salinan tetap sama dengan nama file video yang disalin, karena keduanya disalin apa adanya tanpa diubah.
+- Penyalinan berjalan sebagai job `export` lewat worker, dengan progres dan bisa dibatalkan; job ini tidak mengubah status project.
+- Jika subfolder tujuan sudah ada, pengguna diminta konfirmasi sebelum menimpa. Jika folder tujuan tidak ada atau tidak bisa ditulis, app menolak dengan pesan yang jelas sebelum membuat job apa pun.
+- Tujuannya: setelah disalin, project di app boleh dihapus tanpa membuat media offline di project Premiere.
+
 ### Plugin Premiere
 
 - Panel berisi: pilih video asli, pilih `highlight.json`, nama sequence, tambahan waktu, dan jeda antar potongan.

@@ -11,6 +11,7 @@ import (
 	"smeditor/internal/httpx"
 	"smeditor/internal/modules/job"
 	"smeditor/internal/modules/prompt"
+	"smeditor/internal/modules/settings"
 	"smeditor/internal/storage"
 )
 
@@ -39,6 +40,7 @@ func (f *fakeFolderOpener) OpenFolder(ctx context.Context, path string) error {
 type fakeJobs struct {
 	calledForProject string // last CancelAllForProject target
 	enqueued         []string
+	lastPayload      string
 	active           bool
 	enqueueErr       error
 }
@@ -49,15 +51,35 @@ func (f *fakeJobs) CancelAllForProject(ctx context.Context, projectID string) er
 }
 
 func (f *fakeJobs) Enqueue(ctx context.Context, projectID, jobType string) (*job.Job, error) {
+	return f.EnqueueWithPayload(ctx, projectID, jobType, "")
+}
+
+func (f *fakeJobs) EnqueueWithPayload(ctx context.Context, projectID, jobType, payload string) (*job.Job, error) {
 	if f.enqueueErr != nil {
 		return nil, f.enqueueErr
 	}
 	f.enqueued = append(f.enqueued, jobType)
-	return &job.Job{ID: "fake-job", ProjectID: projectID, Type: jobType, Status: job.StatusQueued}, nil
+	f.lastPayload = payload
+	return &job.Job{ID: "fake-job", ProjectID: projectID, Type: jobType, Status: job.StatusQueued, Payload: payload}, nil
 }
 
 func (f *fakeJobs) HasActiveJob(ctx context.Context, projectID string) (bool, error) {
 	return f.active, nil
+}
+
+// fakeSettingsWriter stands in for settings.Service in tests that queue
+// an export job, capturing the last values map Update received.
+type fakeSettingsWriter struct {
+	lastValues map[string]string
+	err        error
+}
+
+func (f *fakeSettingsWriter) Update(ctx context.Context, values map[string]string) (map[string]string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	f.lastValues = values
+	return values, nil
 }
 
 func newTestService(t *testing.T) *Service {
@@ -80,7 +102,7 @@ func newTestServiceWithJobs(t *testing.T) (*Service, *fakeJobs) {
 	repo := NewRepository(conn)
 	st := storage.New(t.TempDir())
 	jobs := &fakeJobs{}
-	return NewService(repo, st, jobs, &fakePromptAssembler{text: "prompt palsu"}, &fakeFolderOpener{}), jobs
+	return NewService(repo, st, jobs, &fakePromptAssembler{text: "prompt palsu"}, &fakeFolderOpener{}, &fakeSettingsWriter{}), jobs
 }
 
 func validRequest() CreateRequest {
@@ -470,7 +492,7 @@ func TestServiceOpenFolder_OpensTheProjectDir(t *testing.T) {
 	repo := NewRepository(conn)
 	st := storage.New(t.TempDir())
 	opener := &fakeFolderOpener{}
-	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{}, opener)
+	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{}, opener, &fakeSettingsWriter{})
 
 	p, err := svc.Create(context.Background(), validRequest())
 	if err != nil {
@@ -521,7 +543,7 @@ func TestServiceOpenFolder_OpenerFailureReturnsErrorAndPath(t *testing.T) {
 	repo := NewRepository(conn)
 	st := storage.New(t.TempDir())
 	opener := &fakeFolderOpener{err: errors.New("xdg-open: exit status 3")}
-	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{}, opener)
+	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{}, opener, &fakeSettingsWriter{})
 
 	p, err := svc.Create(context.Background(), validRequest())
 	if err != nil {
@@ -541,6 +563,180 @@ func TestServiceOpenFolder_OpenerFailureReturnsErrorAndPath(t *testing.T) {
 	}
 	if gotPath != wantDir {
 		t.Errorf("OpenFolder returned path = %q, want %q", gotPath, wantDir)
+	}
+}
+
+// newExportTestService returns a Service wired with fakes plus a project
+// already at siap_premiere, the status "Salin ke folder" requires.
+func newExportTestService(t *testing.T) (svc *Service, jobs *fakeJobs, sw *fakeSettingsWriter, repo *Repository, p *Project) {
+	t.Helper()
+	conn, err := db.Open(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	if err := db.Migrate(context.Background(), conn); err != nil {
+		t.Fatalf("db.Migrate: %v", err)
+	}
+	repo = NewRepository(conn)
+	st := storage.New(t.TempDir())
+	jobs = &fakeJobs{}
+	sw = &fakeSettingsWriter{}
+	svc = NewService(repo, st, jobs, &fakePromptAssembler{text: "prompt palsu"}, &fakeFolderOpener{}, sw)
+
+	created, err := svc.Create(context.Background(), validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if err := repo.SetHighlightSaved(context.Background(), created.ID); err != nil {
+		t.Fatalf("SetHighlightSaved: %v", err)
+	}
+	p, err = svc.Get(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	return svc, jobs, sw, repo, p
+}
+
+func TestServiceExportToFolder_RejectsWhenNotReady(t *testing.T) {
+	svc, _ := newTestServiceWithJobs(t) // project stays at StatusBaru
+	p, err := svc.Create(context.Background(), validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	_, err = svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: t.TempDir()})
+	if err == nil {
+		t.Fatal("ExportToFolder before siap_premiere: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "export_not_ready" {
+		t.Errorf("code = %q, want export_not_ready", code)
+	}
+}
+
+func TestServiceExportToFolder_RejectsRelativeDest(t *testing.T) {
+	svc, _, _, _, p := newExportTestService(t)
+
+	_, err := svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: "relative/path"})
+	if err == nil {
+		t.Fatal("ExportToFolder with relative dest: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "export_dest_invalid" {
+		t.Errorf("code = %q, want export_dest_invalid", code)
+	}
+}
+
+func TestServiceExportToFolder_RejectsNonexistentDest(t *testing.T) {
+	svc, _, _, _, p := newExportTestService(t)
+	missing := filepath.Join(t.TempDir(), "does-not-exist")
+
+	_, err := svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: missing})
+	if err == nil {
+		t.Fatal("ExportToFolder with nonexistent dest: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "export_dest_invalid" {
+		t.Errorf("code = %q, want export_dest_invalid", code)
+	}
+}
+
+func TestServiceExportToFolder_RejectsNonWritableDest(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root bypasses permission bits")
+	}
+	svc, _, _, _, p := newExportTestService(t)
+	readOnly := t.TempDir()
+	if err := os.Chmod(readOnly, 0o500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { os.Chmod(readOnly, 0o700) })
+
+	_, err := svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: readOnly})
+	if err == nil {
+		t.Fatal("ExportToFolder with read-only dest: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "export_dest_invalid" {
+		t.Errorf("code = %q, want export_dest_invalid", code)
+	}
+}
+
+func TestServiceExportToFolder_RejectsWhenJobActive(t *testing.T) {
+	svc, jobs, _, _, p := newExportTestService(t)
+	jobs.active = true
+
+	_, err := svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: t.TempDir()})
+	if err == nil {
+		t.Fatal("ExportToFolder with an active job: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "job_running" {
+		t.Errorf("code = %q, want job_running", code)
+	}
+}
+
+func TestServiceExportToFolder_ExistingTargetWithoutOverwriteAsksConfirm(t *testing.T) {
+	svc, _, _, _, p := newExportTestService(t)
+	destDir := t.TempDir()
+	target := filepath.Join(destDir, SanitizeFolderName(p.Name))
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatalf("pre-create target dir: %v", err)
+	}
+
+	_, err := svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: destDir})
+	if err == nil {
+		t.Fatal("ExportToFolder with existing target, no overwrite: want error, got nil")
+	}
+	var appErr *httpx.AppError
+	if !errors.As(err, &appErr) {
+		t.Fatalf("error %v is not an *httpx.AppError", err)
+	}
+	if appErr.Code != "export_dir_exists" {
+		t.Errorf("code = %q, want export_dir_exists", appErr.Code)
+	}
+	details, ok := appErr.Details.(map[string]string)
+	if !ok || details["target_dir"] != target {
+		t.Errorf("Details = %#v, want target_dir %q", appErr.Details, target)
+	}
+}
+
+func TestServiceExportToFolder_OverwriteAllowsExistingTarget(t *testing.T) {
+	svc, jobs, _, _, p := newExportTestService(t)
+	destDir := t.TempDir()
+	target := filepath.Join(destDir, SanitizeFolderName(p.Name))
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatalf("pre-create target dir: %v", err)
+	}
+
+	result, err := svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: destDir, Overwrite: true})
+	if err != nil {
+		t.Fatalf("ExportToFolder with overwrite: %v", err)
+	}
+	if result.TargetDir != target {
+		t.Errorf("TargetDir = %q, want %q", result.TargetDir, target)
+	}
+	if last := jobs.enqueued[len(jobs.enqueued)-1]; last != job.TypeExport {
+		t.Errorf("last enqueued job = %q, want %q", last, job.TypeExport)
+	}
+}
+
+func TestServiceExportToFolder_Success(t *testing.T) {
+	svc, jobs, sw, _, p := newExportTestService(t)
+	destDir := t.TempDir()
+	wantTarget := filepath.Join(destDir, SanitizeFolderName(p.Name))
+
+	result, err := svc.ExportToFolder(context.Background(), p.ID, ExportRequest{DestDir: destDir})
+	if err != nil {
+		t.Fatalf("ExportToFolder: %v", err)
+	}
+	if result.TargetDir != wantTarget {
+		t.Errorf("TargetDir = %q, want %q", result.TargetDir, wantTarget)
+	}
+	if result.JobID == "" {
+		t.Error("JobID is empty")
+	}
+	if jobs.lastPayload != wantTarget {
+		t.Errorf("job payload = %q, want %q", jobs.lastPayload, wantTarget)
+	}
+	if sw.lastValues[settings.KeyExportDir] != destDir {
+		t.Errorf("settings export_dir = %q, want %q", sw.lastValues[settings.KeyExportDir], destDir)
 	}
 }
 

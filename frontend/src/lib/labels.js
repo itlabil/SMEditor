@@ -30,6 +30,7 @@ const JOB_TYPE_LABELS = {
   download: 'Mengunduh video',
   convert: 'Mengonversi video',
   transcribe: 'Membuat transcript',
+  export: 'Menyalin ke folder',
 }
 
 // jobTypeLabel returns a friendly label for a job's type (the SSE

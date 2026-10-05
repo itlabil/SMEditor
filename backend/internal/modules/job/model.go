@@ -19,16 +19,25 @@ const (
 	TypeDownload   = "download"
 	TypeConvert    = "convert"
 	TypeTranscribe = "transcribe"
+	// TypeExport copies a project's finished output to a folder outside
+	// data/, per docs/prd.md ("Salin ke folder"). Unlike the other types
+	// it never changes the owning project's status (see
+	// project.JobSync).
+	TypeExport = "export"
 )
 
 type Job struct {
-	ID         string
-	ProjectID  string
-	Type       string
-	Status     string
-	Progress   float64
-	Message    string
-	Error      string
+	ID        string
+	ProjectID string
+	Type      string
+	Status    string
+	Progress  float64
+	Message   string
+	Error     string
+	// Payload is an opaque, job-type-specific string. Only TypeExport
+	// uses it (the destination folder to copy into); every other type
+	// leaves it empty.
+	Payload    string
 	CreatedAt  time.Time
 	StartedAt  *time.Time
 	FinishedAt *time.Time

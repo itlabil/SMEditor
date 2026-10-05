@@ -14,12 +14,12 @@ type Repository struct{ db *sql.DB }
 
 func NewRepository(db *sql.DB) *Repository { return &Repository{db: db} }
 
-const jobColumns = `id, project_id, type, status, progress, message, error, created_at, started_at, finished_at`
+const jobColumns = `id, project_id, type, status, progress, message, error, payload, created_at, started_at, finished_at`
 
 func (r *Repository) Create(ctx context.Context, j *Job) error {
-	const q = `INSERT INTO jobs (` + jobColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	const q = `INSERT INTO jobs (` + jobColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := r.db.ExecContext(ctx, q,
-		j.ID, j.ProjectID, j.Type, j.Status, j.Progress, j.Message, j.Error,
+		j.ID, j.ProjectID, j.Type, j.Status, j.Progress, j.Message, j.Error, j.Payload,
 		formatTime(j.CreatedAt), formatNullTime(j.StartedAt), formatNullTime(j.FinishedAt),
 	)
 	if err != nil {
@@ -181,7 +181,7 @@ func scanJob(row rowScanner) (*Job, error) {
 	var createdAt string
 	var startedAt, finishedAt sql.NullString
 	err := row.Scan(
-		&j.ID, &j.ProjectID, &j.Type, &j.Status, &j.Progress, &j.Message, &j.Error,
+		&j.ID, &j.ProjectID, &j.Type, &j.Status, &j.Progress, &j.Message, &j.Error, &j.Payload,
 		&createdAt, &startedAt, &finishedAt,
 	)
 	if err != nil {

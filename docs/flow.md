@@ -33,7 +33,7 @@ flowchart TD
     K --> L[Rapikan, dubbing, export di Premiere]
 ```
 
-Langkah A sampai I terjadi di app web. Langkah J dilakukan manual. Langkah K dan L terjadi di Premiere.
+Langkah A sampai I terjadi di app web. Langkah J dilakukan lewat tombol "Salin ke folder" di app (lihat 4.5a) atau manual lewat "Buka folder project". Langkah K dan L terjadi di Premiere.
 
 ## 3. Status project
 
@@ -107,7 +107,18 @@ Hapus project tersedia di semua status.
    - Segmen berurutan dan tidak tumpang tindih.
    - `kategori` termasuk daftar kategori genre project.
 3. Jika ada kesalahan, app menampilkan daftar kesalahan per segmen dan tidak menyimpan apa pun.
-4. Jika lolos, app menulis `highlight.json` (ditambah `video` dan `durasi`) dan `narasi.txt`.
+4. Jika lolos, app menulis `highlight.json` (ditambah `video` dan `durasi`) dan `narasi.txt`, status project menjadi `siap_premiere`.
+
+### 4.5a Salin ke folder
+
+Tersedia begitu status project `siap_premiere`; tujuannya supaya project di app boleh dihapus tanpa membuat media offline di project Premiere.
+
+1. Pengguna mengisi folder tujuan (default: nilai `export_dir` tersimpan dari pemakaian terakhir).
+2. App memeriksa folder tujuan ada dan bisa ditulis, lalu menghitung subfolder bernama project (dibersihkan dari karakter yang tidak sah di Windows dan Linux).
+3. Jika subfolder itu sudah ada, app meminta konfirmasi sebelum menimpa.
+4. App menyimpan folder tujuan yang diketik sebagai setting `export_dir` baru, lalu mengantrekan job `export`.
+5. Job menyalin `source.mp4`, `highlight.json`, dan `narasi.txt` ke subfolder itu, dengan progres dan bisa dibatalkan. Job ini tidak mengubah status project.
+6. Setelah selesai, app menampilkan path folder hasil salinan dengan tombol salin.
 
 ### 4.6 Plugin Premiere
 

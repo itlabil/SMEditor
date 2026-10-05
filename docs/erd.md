@@ -55,11 +55,12 @@ erDiagram
     jobs {
         text id PK "ULID"
         text project_id FK
-        text type "download, convert, transcribe"
+        text type "download, convert, transcribe, export"
         text status "queued, running, done, failed, canceled"
         real progress "0 sampai 100"
         text message "baris progres terakhir"
         text error
+        text payload "data khusus jenis job; hanya dipakai export (folder tujuan)"
         datetime created_at
         datetime started_at
         datetime finished_at
@@ -84,6 +85,7 @@ erDiagram
 - Worker hanya menjalankan satu job `running` pada satu waktu.
 - Saat app dinyalakan, job yang masih `running` diubah menjadi `failed` dengan pesan "app ditutup saat job berjalan".
 - Indeks: `(status, created_at)` untuk antrean, `(project_id)` untuk halaman project.
+- `export` ("Salin ke folder") berbeda dari tiga jenis job lain: `payload`-nya berisi folder tujuan absolut (dihitung dari setting `export_dir` plus nama project yang sudah dibersihkan), dan selesainya tidak mengubah status project.
 
 ### prompt_blocks
 
@@ -105,6 +107,7 @@ erDiagram
 | `whisper_path` | `tools/whisper-cli` |
 | `whisper_model` | `tools/models/ggml-medium.bin` |
 | `whisper_device` | `auto`, `cpu`, atau `gpu` |
+| `export_dir` | Folder tujuan terakhir dipakai di "Salin ke folder"; kosong sampai dipakai sekali |
 
 ## Perbedaan dengan PRD
 

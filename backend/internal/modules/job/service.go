@@ -20,11 +20,18 @@ func NewService(repo *Repository, worker *Worker) *Service {
 
 // Enqueue inserts a new queued job for projectID and wakes the worker.
 func (s *Service) Enqueue(ctx context.Context, projectID, jobType string) (*Job, error) {
+	return s.EnqueueWithPayload(ctx, projectID, jobType, "")
+}
+
+// EnqueueWithPayload is Enqueue for a job type that needs one extra piece
+// of data (currently only TypeExport: the destination folder).
+func (s *Service) EnqueueWithPayload(ctx context.Context, projectID, jobType, payload string) (*Job, error) {
 	j := &Job{
 		ID:        idgen.New(),
 		ProjectID: projectID,
 		Type:      jobType,
 		Status:    StatusQueued,
+		Payload:   payload,
 		CreatedAt: time.Now().UTC(),
 	}
 	if err := s.repo.Create(ctx, j); err != nil {
