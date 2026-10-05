@@ -18,6 +18,8 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	g.DELETE("/:id", h.delete)
 	g.GET("/:id/thumbnail", h.thumbnail)
 	g.POST("/:id/download", h.retryDownload)
+	g.POST("/:id/transcribe", h.retryTranscribe)
+	g.GET("/:id/transcript", h.transcript)
 }
 
 func (h *Handler) list(c *gin.Context) {
@@ -76,4 +78,30 @@ func (h *Handler) retryDownload(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, p)
+}
+
+type retryTranscribeRequest struct {
+	TranscriptLang string `json:"transcript_lang"`
+}
+
+func (h *Handler) retryTranscribe(c *gin.Context) {
+	var req retryTranscribeRequest
+	// Body is optional: omitting it just re-runs with the current language.
+	_ = c.ShouldBindJSON(&req)
+
+	p, err := h.svc.RetryTranscribe(c.Request.Context(), c.Param("id"), req.TranscriptLang)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.OK(c, p)
+}
+
+func (h *Handler) transcript(c *gin.Context) {
+	path, filename, err := h.svc.TranscriptPath(c.Request.Context(), c.Param("id"), c.Query("format"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.FileAttachment(path, filename)
 }

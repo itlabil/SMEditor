@@ -1,7 +1,7 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { getProject, retryDownload } from '../api/projects'
+import { getProject, retryDownload, retryTranscribe, transcriptUrl } from '../api/projects'
 import { useNotify } from '../composables/useNotify'
 import { useSSE } from '../composables/useSSE'
 
@@ -11,12 +11,21 @@ const { success, error } = useNotify()
 const project = ref(null)
 const loading = ref(true)
 const retrying = ref(false)
+const retryingTranscript = ref(false)
+const transcriptLang = ref('auto')
 const job = ref(null)
+
+const pastDownload = computed(() =>
+  ['transcript', 'gagal_transcript', 'menunggu_highlight', 'siap_premiere'].includes(project.value?.status),
+)
 
 async function load() {
   loading.value = true
   try {
     project.value = await getProject(route.params.id)
+    if (project.value.transcript_lang) {
+      transcriptLang.value = project.value.transcript_lang
+    }
   } catch (err) {
     error(err.message)
   } finally {
@@ -33,6 +42,18 @@ async function retry() {
     error(err.message)
   } finally {
     retrying.value = false
+  }
+}
+
+async function retryTranscript() {
+  retryingTranscript.value = true
+  try {
+    project.value = await retryTranscribe(route.params.id, transcriptLang.value)
+    success('Transkrip diulang')
+  } catch (err) {
+    error(err.message)
+  } finally {
+    retryingTranscript.value = false
   }
 }
 
@@ -98,6 +119,33 @@ onUnmounted(() => sse.close())
           {{ retrying ? 'Mengulang...' : 'Ulangi unduh' }}
         </button>
       </div>
+
+      <section v-if="pastDownload" class="flex flex-col gap-3 border-t border-slate-800 pt-4">
+        <h2 class="text-lg font-semibold">Transcript</h2>
+
+        <p v-if="project.status === 'gagal_transcript'" class="text-sm text-rose-300">
+          {{ project.error_message || 'Transcript gagal.' }}
+        </p>
+
+        <div class="flex items-end gap-2">
+          <label class="flex flex-col gap-1">
+            <span class="text-sm text-slate-400">Bahasa (auto, id, en, tl, ...)</span>
+            <input v-model="transcriptLang" class="rounded bg-slate-800 px-3 py-2" />
+          </label>
+          <button
+            :disabled="retryingTranscript"
+            class="rounded bg-emerald-600 px-3 py-2 text-sm font-medium disabled:opacity-50"
+            @click="retryTranscript"
+          >
+            {{ retryingTranscript ? 'Memproses...' : 'Transkrip ulang' }}
+          </button>
+        </div>
+
+        <div class="flex gap-3 text-sm">
+          <a :href="transcriptUrl(project.id, 'txt')" class="text-emerald-400 underline">Unduh transcript.txt</a>
+          <a :href="transcriptUrl(project.id, 'json')" class="text-emerald-400 underline">Unduh transcript.json</a>
+        </div>
+      </section>
     </template>
   </main>
 </template>

@@ -110,6 +110,62 @@ func (s *Service) RetryDownload(ctx context.Context, id string) (*Project, error
 	return s.Get(ctx, id)
 }
 
+// RetryTranscribe queues a new transcribe job for id, optionally
+// overriding the requested language ("auto", "id", "en", "tl", or any
+// other whisper language code; empty keeps the current one, defaulting
+// to "auto"). It rejects the retry if a job is already in flight.
+func (s *Service) RetryTranscribe(ctx context.Context, id, lang string) (*Project, error) {
+	if _, err := s.findByID(ctx, id); err != nil {
+		return nil, err
+	}
+	active, err := s.jobs.HasActiveJob(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if active {
+		return nil, httpx.ErrConflict("job_running", "Masih ada job berjalan untuk project ini")
+	}
+
+	lang = strings.TrimSpace(lang)
+	if lang != "" {
+		if err := s.repo.UpdateTranscriptLang(ctx, id, lang); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := s.jobs.Enqueue(ctx, id, job.TypeTranscribe); err != nil {
+		return nil, err
+	}
+	return s.Get(ctx, id)
+}
+
+// TranscriptPath returns the absolute path and suggested download file
+// name for a project's transcript, in the requested format ("txt" is the
+// default).
+func (s *Service) TranscriptPath(ctx context.Context, id, format string) (path, filename string, err error) {
+	if _, err := s.findByID(ctx, id); err != nil {
+		return "", "", err
+	}
+
+	var file string
+	switch format {
+	case "", "txt":
+		file, filename = storage.TranscriptTXTFile, "transcript.txt"
+	case "json":
+		file, filename = storage.TranscriptJSONFile, "transcript.json"
+	default:
+		return "", "", httpx.ErrBadRequest("invalid_format", "Format harus txt atau json")
+	}
+
+	if !s.storage.Stat(id, file) {
+		return "", "", httpx.ErrConflict("transcript_missing", "Transcript belum ada")
+	}
+	path, err = s.storage.FilePath(id, file)
+	if err != nil {
+		return "", "", err
+	}
+	return path, filename, nil
+}
+
 func (s *Service) List(ctx context.Context) ([]Project, error) {
 	list, err := s.repo.List(ctx)
 	if err != nil {

@@ -55,8 +55,10 @@ func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Eng
 	ytdlpClient := ytdlp.Client{}
 	ffmpegClient := ffmpeg.Ffmpeg{}
 	ffprobeClient := ffmpeg.Ffprobe{}
+	whisperClient := whisper.Client{}
 	jobWorker.Register(project.NewDownloadRunner(projectRepo, st, settingsSvc, ytdlpClient, ffprobeClient, ffmpegClient, jobSvc))
 	jobWorker.Register(project.NewConvertRunner(projectRepo, st, settingsSvc, ffmpegClient, ffprobeClient))
+	jobWorker.Register(project.NewTranscribeRunner(projectRepo, st, settingsSvc, ffmpegClient, whisperClient))
 
 	if err := jobWorker.RecoverStaleRunning(ctx); err != nil {
 		return nil, err

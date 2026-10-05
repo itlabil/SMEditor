@@ -22,7 +22,7 @@ const (
 	// before it replaces SourceVideoFile, so a canceled or failed
 	// conversion never corrupts the original.
 	ConvertTempFile = "convert_tmp.mp4"
-	ThumbnailFile      = "thumbnail.jpg"
+	ThumbnailFile   = "thumbnail.jpg"
 )
 
 var ulidPattern = regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{26}$`)

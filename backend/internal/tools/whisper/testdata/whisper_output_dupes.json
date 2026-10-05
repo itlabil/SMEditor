@@ -1,0 +1,35 @@
+{
+	"result": {
+		"language": "id"
+	},
+	"transcription": [
+		{
+			"offsets": { "from": 0, "to": 2740 },
+			"text": " Halo semua"
+		},
+		{
+			"offsets": { "from": 2800, "to": 5000 },
+			"text": "   "
+		},
+		{
+			"offsets": { "from": 5100, "to": 7000 },
+			"text": ""
+		},
+		{
+			"offsets": { "from": 7200, "to": 9500 },
+			"text": " selamat datang di pertandingan"
+		},
+		{
+			"offsets": { "from": 9600, "to": 11000 },
+			"text": " selamat datang di pertandingan"
+		},
+		{
+			"offsets": { "from": 11200, "to": 13000 },
+			"text": " selamat datang di pertandingan"
+		},
+		{
+			"offsets": { "from": 13200, "to": 15000 },
+			"text": " babak pertama dimulai"
+		}
+	]
+}

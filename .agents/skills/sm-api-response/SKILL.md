@@ -94,6 +94,7 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `highlight_invalid` | 422 | JSON highlight melanggar aturan |
 | `tool_not_found` | 409 | yt-dlp, ffmpeg, atau Whisper tidak ditemukan |
 | `thumbnail_not_found` | 404 | Thumbnail project belum tersedia |
+| `invalid_format` | 400 | Parameter `format` bukan `txt` atau `json` |
 | `unknown_setting_key` | 400 | Key pengaturan tidak dikenal |
 | `invalid_whisper_device` | 400 | `whisper_device` bukan `auto`, `cpu`, atau `gpu` |
 | `internal_error` | 500 | Kesalahan tak terduga |

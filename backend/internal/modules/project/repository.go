@@ -96,6 +96,18 @@ func (r *Repository) UpdateStatus(ctx context.Context, id, status, errorMessage 
 	return nil
 }
 
+// UpdateTranscriptLang sets the requested transcript language ("auto",
+// "id", "en", "tl", or any other whisper language code), used by
+// TranscribeRunner when it next runs.
+func (r *Repository) UpdateTranscriptLang(ctx context.Context, id, lang string) error {
+	const q = `UPDATE projects SET transcript_lang = ?, updated_at = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, q, lang, formatTime(time.Now()), id)
+	if err != nil {
+		return fmt.Errorf("update transcript language for %s: %w", id, err)
+	}
+	return nil
+}
+
 // DownloadMetadata is what a finished download writes back to the
 // project row, per docs/erd.md.
 type DownloadMetadata struct {

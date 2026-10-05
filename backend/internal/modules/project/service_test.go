@@ -298,3 +298,139 @@ func TestServiceRetryDownload_NotFound(t *testing.T) {
 		t.Errorf("code = %q, want project_not_found", code)
 	}
 }
+
+func TestServiceRetryTranscribe_EnqueuesAndUpdatesLanguage(t *testing.T) {
+	svc, jobs := newTestServiceWithJobs(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	jobs.enqueued = nil
+
+	got, err := svc.RetryTranscribe(ctx, p.ID, "id")
+	if err != nil {
+		t.Fatalf("RetryTranscribe: %v", err)
+	}
+	if got.ID != p.ID {
+		t.Errorf("RetryTranscribe returned project %q, want %q", got.ID, p.ID)
+	}
+	if len(jobs.enqueued) != 1 || jobs.enqueued[0] != job.TypeTranscribe {
+		t.Errorf("enqueued jobs = %v, want exactly one %q", jobs.enqueued, job.TypeTranscribe)
+	}
+
+	stored, err := svc.repo.FindByID(ctx, p.ID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if stored.TranscriptLang != "id" {
+		t.Errorf("TranscriptLang = %q, want id", stored.TranscriptLang)
+	}
+}
+
+func TestServiceRetryTranscribe_EmptyLangKeepsExisting(t *testing.T) {
+	svc, jobs := newTestServiceWithJobs(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if err := svc.repo.UpdateTranscriptLang(ctx, p.ID, "en"); err != nil {
+		t.Fatalf("UpdateTranscriptLang: %v", err)
+	}
+	jobs.enqueued = nil
+
+	if _, err := svc.RetryTranscribe(ctx, p.ID, ""); err != nil {
+		t.Fatalf("RetryTranscribe: %v", err)
+	}
+
+	stored, err := svc.repo.FindByID(ctx, p.ID)
+	if err != nil {
+		t.Fatalf("FindByID: %v", err)
+	}
+	if stored.TranscriptLang != "en" {
+		t.Errorf("TranscriptLang = %q, want it to stay en when retry sends no override", stored.TranscriptLang)
+	}
+}
+
+func TestServiceRetryTranscribe_RejectsWhenJobActive(t *testing.T) {
+	svc, jobs := newTestServiceWithJobs(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	jobs.active = true
+
+	_, err = svc.RetryTranscribe(ctx, p.ID, "")
+	if err == nil {
+		t.Fatal("RetryTranscribe while a job is active: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "job_running" {
+		t.Errorf("code = %q, want job_running", code)
+	}
+}
+
+func TestServiceTranscriptPath_MissingReturnsConflict(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	_, _, err = svc.TranscriptPath(ctx, p.ID, "txt")
+	if err == nil {
+		t.Fatal("TranscriptPath before transcript exists: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "transcript_missing" {
+		t.Errorf("code = %q, want transcript_missing", code)
+	}
+}
+
+func TestServiceTranscriptPath_InvalidFormat(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	_, _, err = svc.TranscriptPath(ctx, p.ID, "pdf")
+	if err == nil {
+		t.Fatal("TranscriptPath with invalid format: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "invalid_format" {
+		t.Errorf("code = %q, want invalid_format", code)
+	}
+}
+
+func TestServiceTranscriptPath_ReturnsPathWhenPresent(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	path, err := svc.storage.FilePath(p.ID, storage.TranscriptTXTFile)
+	if err != nil {
+		t.Fatalf("FilePath: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("[00:00:00] halo\n"), 0o644); err != nil {
+		t.Fatalf("seed transcript.txt: %v", err)
+	}
+
+	got, filename, err := svc.TranscriptPath(ctx, p.ID, "txt")
+	if err != nil {
+		t.Fatalf("TranscriptPath: %v", err)
+	}
+	if got != path || filename != "transcript.txt" {
+		t.Errorf("TranscriptPath = (%q, %q), want (%q, %q)", got, filename, path, "transcript.txt")
+	}
+}

@@ -23,3 +23,11 @@ export function retryDownload(id) {
 export function thumbnailUrl(id) {
   return `/api/projects/${id}/thumbnail`
 }
+
+export function retryTranscribe(id, transcriptLang) {
+  return request('POST', `/projects/${id}/transcribe`, { transcript_lang: transcriptLang })
+}
+
+export function transcriptUrl(id, format) {
+  return `/api/projects/${id}/transcript?format=${format}`
+}
