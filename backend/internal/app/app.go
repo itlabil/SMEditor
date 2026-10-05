@@ -12,7 +12,9 @@ import (
 
 	"smeditor/internal/db"
 	"smeditor/internal/httpx"
+	"smeditor/internal/modules/project"
 	"smeditor/internal/modules/settings"
+	"smeditor/internal/storage"
 	"smeditor/internal/tools"
 	"smeditor/internal/tools/ffmpeg"
 	"smeditor/internal/tools/whisper"
@@ -20,7 +22,7 @@ import (
 	"smeditor/internal/webdist"
 )
 
-func NewRouter(conn *sql.DB) *gin.Engine {
+func NewRouter(conn *sql.DB, st *storage.Storage) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
@@ -32,6 +34,10 @@ func NewRouter(conn *sql.DB) *gin.Engine {
 	settingsRepo := settings.NewRepository(conn)
 	settingsSvc := settings.NewService(settingsRepo, ytdlp.Client{}, ffmpeg.Ffmpeg{}, ffmpeg.Ffprobe{}, whisper.Client{})
 	settings.NewHandler(settingsSvc).Register(api)
+
+	projectRepo := project.NewRepository(conn)
+	projectSvc := project.NewService(projectRepo, st)
+	project.NewHandler(projectSvc).Register(api)
 
 	registerFrontend(r)
 
@@ -75,7 +81,8 @@ func Run() error {
 		return err
 	}
 
-	r := NewRouter(conn)
+	st := storage.New(cfg.DataPath())
+	r := NewRouter(conn, st)
 
 	srv := &http.Server{
 		Addr:    "127.0.0.1:" + cfg.Port,

@@ -93,6 +93,7 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `transcript_missing` | 409 | Transcript belum ada |
 | `highlight_invalid` | 422 | JSON highlight melanggar aturan |
 | `tool_not_found` | 409 | yt-dlp, ffmpeg, atau Whisper tidak ditemukan |
+| `thumbnail_not_found` | 404 | Thumbnail project belum tersedia |
 | `unknown_setting_key` | 400 | Key pengaturan tidak dikenal |
 | `invalid_whisper_device` | 400 | `whisper_device` bukan `auto`, `cpu`, atau `gpu` |
 | `internal_error` | 500 | Kesalahan tak terduga |
@@ -103,6 +104,7 @@ Sebelum membuat kode baru, periksa tabel ini. Jika menambah, tambahkan juga bari
 
 - `GET /api/projects/:id/events` adalah SSE (`text/event-stream`). Tiap event berisi JSON: `{"type":"progress|done|failed","job_id":"...","progress":42.5,"message":"..."}`.
 - Endpoint unduh file (`transcript`, `narasi`) mengembalikan isi file dengan header `Content-Disposition`. Jika gagal, tetap mengembalikan bentuk error JSON.
+- `GET /api/projects/:id/thumbnail` mengembalikan isi file gambar langsung (`Content-Type: image/jpeg`), bukan bentuk `{"data": ...}`. Jika gagal, tetap mengembalikan bentuk error JSON.
 
 ## Frontend
 
