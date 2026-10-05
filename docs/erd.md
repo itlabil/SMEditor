@@ -105,7 +105,6 @@ erDiagram
 | `whisper_path` | `tools/whisper-cli` |
 | `whisper_model` | `tools/models/ggml-medium.bin` |
 | `whisper_device` | `auto`, `cpu`, atau `gpu` |
-| `data_dir` | `data` |
 
 ## Perbedaan dengan PRD
 

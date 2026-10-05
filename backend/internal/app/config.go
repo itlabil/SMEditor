@@ -3,7 +3,8 @@ package app
 import "os"
 
 type Config struct {
-	Port string
+	Port    string
+	DataDir string
 }
 
 func LoadConfig() Config {
@@ -11,5 +12,9 @@ func LoadConfig() Config {
 	if port == "" {
 		port = "8080"
 	}
-	return Config{Port: port}
+	dataDir := os.Getenv("SMEDITOR_DATA_DIR")
+	if dataDir == "" {
+		dataDir = "data"
+	}
+	return Config{Port: port, DataDir: dataDir}
 }

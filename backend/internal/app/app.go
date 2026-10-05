@@ -1,12 +1,15 @@
 package app
 
 import (
+	"context"
 	"io/fs"
 	"log"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 
+	"smeditor/internal/db"
 	"smeditor/internal/httpx"
 	"smeditor/internal/webdist"
 )
@@ -47,6 +50,17 @@ func registerFrontend(r *gin.Engine) {
 // Run starts the HTTP server, bound to 127.0.0.1 only.
 func Run() error {
 	cfg := LoadConfig()
+
+	conn, err := db.Open(filepath.Join(cfg.DataDir, "app.db"))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if err := db.Migrate(context.Background(), conn); err != nil {
+		return err
+	}
+
 	r := NewRouter()
 
 	srv := &http.Server{
