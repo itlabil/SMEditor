@@ -62,6 +62,8 @@ Saat `ctx` dibatalkan, seluruh pohon proses harus mati, karena yt-dlp memanggil 
 - Progres: aktifkan opsi cetak progres jika ada; jika tidak, hitung dari timestamp segmen terakhir dibagi durasi audio.
 - Jumlah thread default: jumlah core fisik, maksimal 8.
 - Teks segmen di-trim; segmen kosong dan segmen berulang persis berturut-turut dibuang.
+- GPU atau CPU dibaca dari baris awal keluaran, bukan ditebak dari nama file: `loaded CUDA backend` / `using CUDA0 backend` berarti GPU; `no GPU found`, atau hanya `loaded CPU backend`, berarti CPU. Build cuBLAS yang `ggml-cuda.dll`-nya gagal dimuat tetap jalan di CPU tanpa error. "Periksa Tool" membaca baris ini dari `whisper-cli --version` (`parseBackend`, dites dengan `testdata/version_*.txt`).
+- Versi diambil dari baris yang memuat "version" (`whisper.cpp version: ...`), karena build CUDA mencetak baris perangkat lebih dulu.
 
 ## Tes
 

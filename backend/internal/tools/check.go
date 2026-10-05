@@ -11,6 +11,10 @@ type CheckResult struct {
 	Path    string
 	Found   bool
 	Version string
+	// Output is the raw combined stdout/stderr of the version call, for
+	// tools that report more than a version there (whisper prints which
+	// compute backend it loaded).
+	Output string
 }
 
 // CheckExecutable resolves path and, if found, runs it with versionArgs to
@@ -24,5 +28,5 @@ func CheckExecutable(ctx context.Context, path string, versionArgs []string, par
 	}
 
 	out, _ := exec.CommandContext(ctx, resolved, versionArgs...).CombinedOutput()
-	return CheckResult{Path: resolved, Found: true, Version: parseVersion(string(out))}
+	return CheckResult{Path: resolved, Found: true, Version: parseVersion(string(out)), Output: string(out)}
 }

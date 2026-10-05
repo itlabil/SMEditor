@@ -39,4 +39,9 @@ type CheckResult struct {
 	Path    string `json:"path"`
 	Found   bool   `json:"found"`
 	Version string `json:"version"`
+	// Backend is only set for whisper: "gpu" or "cpu", read from the
+	// backend lines whisper-cli prints at startup, or "" when its output
+	// does not say. GPU is the CUDA device name when one was found.
+	Backend string `json:"backend,omitempty"`
+	GPU     string `json:"gpu,omitempty"`
 }

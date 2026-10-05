@@ -1,0 +1,2 @@
+load_backend: loaded CPU backend from D:\SMEditor\tools\whisper\ggml-cpu-cascadelake.dll
+whisper.cpp version: 1.9.4

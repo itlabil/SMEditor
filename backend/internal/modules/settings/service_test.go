@@ -19,6 +19,18 @@ func (f *fakeToolClient) Check(ctx context.Context, path string) (string, bool, 
 	return path, f.found, f.version
 }
 
+type fakeWhisperClient struct {
+	path    string
+	found   bool
+	backend string
+	gpu     string
+}
+
+func (f *fakeWhisperClient) CheckWithBackend(ctx context.Context, path string) (string, bool, string, string, string) {
+	f.path = path
+	return path, f.found, "", f.backend, f.gpu
+}
+
 type fakeModelClient struct {
 	path  string
 	found bool
@@ -29,7 +41,7 @@ func (f *fakeModelClient) CheckModel(ctx context.Context, path string) (string, 
 	return path, f.found, ""
 }
 
-func newTestService(t *testing.T) (*Service, *fakeToolClient, *fakeToolClient, *fakeToolClient, *fakeToolClient, *fakeModelClient) {
+func newTestService(t *testing.T) (*Service, *fakeToolClient, *fakeToolClient, *fakeToolClient, *fakeWhisperClient, *fakeModelClient) {
 	t.Helper()
 	conn, err := db.Open(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
@@ -44,7 +56,7 @@ func newTestService(t *testing.T) (*Service, *fakeToolClient, *fakeToolClient, *
 	ytdlp := &fakeToolClient{found: true, version: "2024.08.06"}
 	ffmpeg := &fakeToolClient{found: true, version: "6.1.1"}
 	ffprobe := &fakeToolClient{found: true, version: "6.1.1"}
-	whisper := &fakeToolClient{found: false}
+	whisper := &fakeWhisperClient{found: false}
 	whisperModel := &fakeModelClient{found: true}
 
 	return NewService(repo, ytdlp, ffmpeg, ffprobe, whisper, whisperModel), ytdlp, ffmpeg, ffprobe, whisper, whisperModel
@@ -166,5 +178,35 @@ func TestServiceCheckReportsModelNotFound(t *testing.T) {
 	}
 	if byTool["model whisper"].Found {
 		t.Errorf(`model whisper result = %+v, want found=false`, byTool["model whisper"])
+	}
+}
+
+func TestServiceCheckReportsWhisperBackend(t *testing.T) {
+	cases := []struct {
+		name, backend, gpu string
+	}{
+		{"gpu", "gpu", "NVIDIA GeForce GTX 1650"},
+		{"cpu", "cpu", ""},
+		{"unknown", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, _, _, _, whisper, _ := newTestService(t)
+			whisper.found, whisper.backend, whisper.gpu = true, tc.backend, tc.gpu
+
+			results, err := svc.Check(context.Background())
+			if err != nil {
+				t.Fatalf("Check: %v", err)
+			}
+			for _, r := range results {
+				if r.Tool == "whisper" {
+					if r.Backend != tc.backend || r.GPU != tc.gpu {
+						t.Errorf("whisper result = %+v, want backend %q gpu %q", r, tc.backend, tc.gpu)
+					}
+				} else if r.Backend != "" {
+					t.Errorf("%s result has backend %q, want none", r.Tool, r.Backend)
+				}
+			}
+		})
 	}
 }

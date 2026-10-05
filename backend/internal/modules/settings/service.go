@@ -14,6 +14,13 @@ type ToolClient interface {
 	Check(ctx context.Context, path string) (resolvedPath string, found bool, version string)
 }
 
+// WhisperClient is a ToolClient that also reports, from the same
+// --version run, which compute backend whisper-cli loaded ("gpu", "cpu",
+// or "" if unknown) and the GPU name. Implemented by whisper.Client.
+type WhisperClient interface {
+	CheckWithBackend(ctx context.Context, path string) (resolvedPath string, found bool, version, backend, gpu string)
+}
+
 // ModelClient checks whether a configured model file exists. Unlike
 // ToolClient, it never runs anything: a model file has no --version to
 // call, so there is no "version" to report.
@@ -26,11 +33,11 @@ type Service struct {
 	ytdlp        ToolClient
 	ffmpeg       ToolClient
 	ffprobe      ToolClient
-	whisper      ToolClient
+	whisper      WhisperClient
 	whisperModel ModelClient
 }
 
-func NewService(repo *Repository, ytdlp, ffmpeg, ffprobe, whisper ToolClient, whisperModel ModelClient) *Service {
+func NewService(repo *Repository, ytdlp, ffmpeg, ffprobe ToolClient, whisper WhisperClient, whisperModel ModelClient) *Service {
 	return &Service{repo: repo, ytdlp: ytdlp, ffmpeg: ffmpeg, ffprobe: ffprobe, whisper: whisper, whisperModel: whisperModel}
 }
 
@@ -90,14 +97,16 @@ func (s *Service) Check(ctx context.Context) ([]CheckResult, error) {
 		{"yt-dlp", KeyYtdlpPath, s.ytdlp},
 		{"ffmpeg", KeyFfmpegPath, s.ffmpeg},
 		{"ffprobe", KeyFfprobePath, s.ffprobe},
-		{"whisper", KeyWhisperPath, s.whisper},
 	}
 
-	results := make([]CheckResult, 0, len(tools)+1)
+	results := make([]CheckResult, 0, len(tools)+2)
 	for _, t := range tools {
 		path, found, version := t.client.Check(ctx, current[t.key])
 		results = append(results, CheckResult{Tool: t.name, Path: path, Found: found, Version: version})
 	}
+
+	path, found, version, backend, gpu := s.whisper.CheckWithBackend(ctx, current[KeyWhisperPath])
+	results = append(results, CheckResult{Tool: "whisper", Path: path, Found: found, Version: version, Backend: backend, GPU: gpu})
 
 	modelPath, modelFound, _ := s.whisperModel.CheckModel(ctx, current[KeyWhisperModel])
 	results = append(results, CheckResult{Tool: "model whisper", Path: modelPath, Found: modelFound})

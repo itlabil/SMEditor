@@ -1,0 +1,8 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 4095 MiB):
+  Device 0: NVIDIA GeForce GTX 1650 with Max-Q Design, compute capability 7.5, VMM: yes, VRAM: 4095 MiB
+The following devices will have suboptimal performance due to a lack of tensor cores:
+  Device 0: NVIDIA GeForce GTX 1650 with Max-Q Design
+Consider compiling with CMAKE_CUDA_ARCHITECTURES=61-virtual;80-virtual and DGGML_CUDA_FORCE_MMQ to force the use of the Pascal code for Turing.
+load_backend: loaded CUDA backend from D:\SMEditor\tools\whisper-gpu12\ggml-cuda.dll
+load_backend: loaded CPU backend from D:\SMEditor\tools\whisper-gpu12\ggml-cpu-cascadelake.dll
+whisper.cpp version: 1.9.4

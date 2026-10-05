@@ -55,10 +55,34 @@ Karena keduanya ada di PATH, nilai bawaan pengaturan (`ffmpeg` dan `ffprobe`) su
 - **Rilis bertag versi seperti `v1.9.4` tidak punya file unduhan (aset) binary.** Binary Windows ada di rilis build bernomor, yaitu rilis **`b5130`**. Buka rilis itu, lalu bagian *Assets*.
 - Pilih salah satu:
   - `whisper-bin-x64.zip` — CPU saja. Jalan di semua PC, tanpa syarat driver.
-  - `whisper-cublas-*-bin-x64.zip` — GPU NVIDIA (CUDA/cuBLAS); `*` adalah versi CUDA build itu. Butuh kartu NVIDIA dengan driver yang mendukung versi CUDA tersebut. Pakai ini supaya transcript bisa berjalan di GPU.
+  - `whisper-cublas-12.4.0-bin-x64.zip` — GPU NVIDIA (CUDA 12/cuBLAS). Butuh kartu NVIDIA dengan driver yang mendukung CUDA 12. Pakai ini supaya transcript bisa berjalan di GPU. Paket ini sudah membawa `cudart64_12.dll`, `cublas64_12.dll`, dan `cublasLt64_12.dll`.
+- **Jangan pakai `whisper-cublas-11.8.0-bin-x64.zip`.** Pada pemasangan nyata (GTX 1650), `ggml-cuda.dll` dari paket ini gagal dimuat (`LoadLibrary` gagal dengan kode 126: ada pustaka CUDA yang tidak ikut di paket). whisper-cli tidak menampilkan error apa pun dan **diam-diam berjalan di CPU**, jauh lebih lambat. Periksa selalu dengan langkah 4a.
 - Ekstrak **seluruh isi** zip, termasuk semua file `.dll`, ke `tools\whisper\`. Jika zip berisi subfolder (misalnya `Release\`), pindahkan isinya supaya `whisper-cli.exe` berada langsung di `tools\whisper\whisper-cli.exe`.
 - Semua `.dll` (`whisper.dll`, `ggml.dll`, `ggml-base.dll`, `ggml-cpu-*.dll`, `SDL2.dll`, dan untuk build GPU `ggml-cuda.dll` beserta DLL runtime CUDA) wajib berada **sejajar** dengan `whisper-cli.exe` di `tools\whisper\`. Windows mencari DLL di folder yang sama dengan .exe yang memanggilnya; jika ada DLL yang tertinggal, `whisper-cli.exe` gagal start tanpa pesan yang jelas.
 - Zip juga berisi banyak program lain (`bench.exe`, `stream.exe`, `main.exe`, dan sebagainya). Boleh dibiarkan; app hanya memanggil `whisper-cli.exe`.
+
+### 4a. Pastikan Whisper memakai GPU
+
+Jalankan whisper-cli langsung dari root folder app dengan model dan satu file audio pendek (misalnya `audio.wav` dari folder project mana pun di `data\projects\<id>\`):
+
+```
+.\tools\whisper\whisper-cli.exe -m .\tools\models\ggml-medium.bin -f <file audio.wav>
+```
+
+Lihat baris-baris awal keluarannya:
+
+| Baris | Arti |
+|---|---|
+| `load_backend: loaded CUDA backend from ...\ggml-cuda.dll` | Pustaka CUDA berhasil dimuat |
+| `whisper_backend_init_gpu: using CUDA0 backend` | Model benar-benar berjalan di GPU — **ini yang dicari** |
+| `whisper_backend_init_gpu: no GPU found` | Berjalan di **CPU** |
+| Hanya `load_backend: loaded CPU backend ...`, tanpa baris CUDA | Build CPU, atau `ggml-cuda.dll` gagal dimuat (lihat catatan paket 11.8.0 di atas); berjalan di **CPU** |
+
+Cara cepat tanpa model: `.\tools\whisper\whisper-cli.exe --version` sudah mencetak baris `load_backend` (dan nama GPU dari `ggml_cuda_init`). Tombol **Periksa Tool** di app (langkah 8) memakai cara ini dan menampilkan apakah Whisper berjalan dengan GPU atau CPU.
+
+### 4b. Tutup Premiere selama transcript
+
+GTX 1650 hanya punya VRAM 4 GB. Model Whisper di GPU memakai cukup banyak VRAM (makin besar model, makin banyak), dan Premiere juga memakai VRAM. **Tutup Premiere selama transcript berjalan**; jika tidak, whisper bisa gagal mengalokasikan memori GPU atau berjalan sangat lambat. Buka lagi Premiere setelah status project berubah menjadi `menunggu_highlight`.
 
 ## 5. Unduh model Whisper (ggml-medium)
 
@@ -111,7 +135,7 @@ Default `ffmpeg`/`ffprobe` (lihat `docs/erd.md`) sudah cocok karena keduanya dip
 
 Path relatif ini dihitung dari folder `smeditor.exe`, bukan dari folder tempat Command Prompt dibuka — lihat `tools.ResolveExecutable` di `.agents/skills/sm-external-tools`. `.exe` tidak perlu ditulis; app menambahkannya otomatis di Windows.
 
-Klik **Simpan**, lalu klik **Periksa Tool** — keempat tool dan model harus muncul "ditemukan". Kalau salah satu masih "tidak ditemukan", periksa ulang nama file dan lokasinya sesuai langkah 1. Jika ffmpeg/ffprobe "tidak ditemukan" padahal sudah dipasang, tutup lalu jalankan ulang `smeditor.exe` supaya PATH baru terbaca.
+Klik **Simpan**, lalu klik **Periksa Tool** — keempat tool dan model harus muncul "ditemukan". Di bawah baris whisper tampil keterangan **"Berjalan dengan GPU (CUDA): <nama GPU>"** atau **"Berjalan dengan CPU"**, dibaca dari keluaran awal `whisper-cli --version` (baris `loaded CUDA backend` atau hanya `loaded CPU backend`). Jika tertulis CPU padahal Anda memasang paket cuBLAS, ulangi langkah 4 dengan paket 12.4.0 dan pastikan semua DLL ikut tersalin. Kalau salah satu masih "tidak ditemukan", periksa ulang nama file dan lokasinya sesuai langkah 1. Jika ffmpeg/ffprobe "tidak ditemukan" padahal sudah dipasang, tutup lalu jalankan ulang `smeditor.exe` supaya PATH baru terbaca.
 
 > Catatan: konversi video ke H.264 (saat sumber bukan H.264) saat ini selalu berjalan di CPU (`libx264`) terlepas dari pengaturan `whisper_device` — GPU di app ini hanya dipakai untuk transcript Whisper, bukan untuk encode video.
 
@@ -120,7 +144,7 @@ Klik **Simpan**, lalu klik **Periksa Tool** — keempat tool dan model harus mun
 Sesuai kriteria terima SM-10, pastikan di Windows:
 
 1. Buat project baru dengan URL YouTube video pendek → unduh berhasil (status berubah ke `menunggu_highlight` lewat `transcript`).
-2. Transcript berjalan dengan `whisper_device` = `auto` atau `gpu` → log konsol/Task Manager menunjukkan proses GPU terpakai (lihat kolom GPU di Task Manager saat `whisper-cli.exe` berjalan).
+2. Transcript berjalan dengan `whisper_device` = `auto` atau `gpu`, dengan Premiere ditutup (langkah 4b) → **Periksa Tool** menampilkan "Berjalan dengan GPU (CUDA)", dan Task Manager menunjukkan GPU terpakai saat `whisper-cli.exe` berjalan. Untuk kepastian penuh, jalankan whisper-cli langsung seperti langkah 4a dan cari `using CUDA0 backend`.
 3. Tempel JSON highlight contoh dan validasi berhasil → `highlight.json` dan `narasi.txt` tersimpan, status `siap_premiere`.
 
 ## Catatan Windows untuk "Buka folder project" dan "Salin ke folder"

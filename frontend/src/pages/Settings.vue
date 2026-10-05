@@ -182,6 +182,18 @@ onMounted(() => {
           <div>
             <p class="font-medium">{{ r.tool }}</p>
             <p class="font-mono text-xs text-slate-500">{{ r.path }}</p>
+            <template v-if="r.tool === 'whisper' && r.found">
+              <p v-if="r.backend === 'gpu'" class="text-xs text-emerald-400">
+                Berjalan dengan GPU (CUDA){{ r.gpu ? `: ${r.gpu}` : '' }}
+                <span v-if="form.whisper_device === 'cpu'" class="text-amber-400">
+                  · tapi Perangkat Whisper diatur ke cpu, jadi transcript tetap di CPU
+                </span>
+              </p>
+              <p v-else-if="r.backend === 'cpu'" class="text-xs text-amber-400">
+                Berjalan dengan CPU: build tanpa CUDA, atau ggml-cuda.dll gagal dimuat (DLL CUDA tidak lengkap)
+              </p>
+              <p v-else class="text-xs text-slate-500">GPU atau CPU tidak diketahui: keluaran whisper-cli tidak menyebutkannya</p>
+            </template>
           </div>
           <span :class="r.found ? 'text-emerald-400' : 'text-rose-400'">
             {{ r.found ? (r.version ? `ditemukan (${r.version})` : 'ditemukan') : 'tidak ditemukan' }}
