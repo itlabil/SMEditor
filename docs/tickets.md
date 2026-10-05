@@ -28,6 +28,7 @@ Kerjakan berurutan, satu tiket per sesi. Sebuah tiket selesai jika semua kriteri
 | SM-12 | Plugin: sequence dan potongan | SM-11 |
 | SM-13 | Plugin: marker dan laporan | SM-12 |
 | SM-14 | Salin ke folder | SM-09 |
+| SM-15 | Ubah dan hapus segmen highlight | SM-09 |
 
 ---
 
@@ -166,3 +167,15 @@ Kriteria terima:
 - Setelah selesai, tampilkan path hasil dengan tombol salin.
 - `docs/prd.md`, `docs/flow.md`, `docs/erd.md`, `docs/sequence.md` diperbarui; kode error baru ditambahkan ke skill `sm-api-response`.
 - Unit test untuk pembersihan nama folder dan penolakan path tujuan yang tidak sah.
+
+## SM-15 — Ubah dan hapus segmen highlight
+
+Memperbaiki segmen hasil AI langsung dari halaman project, tanpa menempel ulang seluruh JSON.
+
+Kriteria terima:
+- Di daftar highlight halaman project, tiap segmen punya tombol "Ubah" yang membuka form berisi label, narasi, kategori, waktu mulai, dan waktu selesai. Field `alasan` tidak diubah.
+- Simpan menjalankan validasi yang sama dengan saat menempel JSON (seluruh highlight diperiksa ulang, termasuk urutan dan tumpang tindih dengan segmen lain), lalu menulis ulang `highlight.json` dan `narasi.txt`.
+- Kesalahan validasi ditampilkan di form; file tidak berubah.
+- Tiap segmen punya tombol hapus dengan konfirmasi SweetAlert. Menghapus segmen terakhir ditolak; untuk itu pakai "Hapus highlight".
+- Endpoint: `PUT` dan `DELETE /api/projects/:id/highlight/segmen/:nomor` (nomor mulai dari 1). Kode error baru `segment_not_found` ditambahkan ke skill `sm-api-response`.
+- Unit test untuk ubah segmen (berhasil, tiap aturan validasi, nomor tidak ada) dan hapus segmen.

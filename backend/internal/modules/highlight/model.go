@@ -36,3 +36,22 @@ type SavedHighlight struct {
 	Video     string    `json:"video"`
 	Durasi    float64   `json:"durasi"`
 }
+
+// toHighlight drops the app-added fields so a saved highlight can be
+// edited and re-checked with Validate. The segment slice is copied so
+// edits never alias the caller's SavedHighlight.
+func (s *SavedHighlight) toHighlight() *Highlight {
+	segmen := make([]Segment, len(s.Segmen))
+	copy(segmen, s.Segmen)
+	return &Highlight{Game: s.Game, Ringkasan: s.Ringkasan, Segmen: segmen}
+}
+
+// SegmentInput is the edit form for one segment on the project page
+// (SM-15). "alasan" is not editable there and is kept as-is.
+type SegmentInput struct {
+	Mulai    string `json:"mulai"`
+	Selesai  string `json:"selesai"`
+	Kategori string `json:"kategori"`
+	Label    string `json:"label"`
+	Narasi   string `json:"narasi"`
+}

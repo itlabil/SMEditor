@@ -21,6 +21,8 @@ Semua respons API berformat JSON: `{"data": ...}` saat berhasil, `{"error": {"co
 | POST | `/api/projects/:id/highlight` | Validasi dan simpan highlight |
 | GET | `/api/projects/:id/highlight` | Baca highlight yang sudah tersimpan |
 | DELETE | `/api/projects/:id/highlight` | Hapus highlight |
+| PUT | `/api/projects/:id/highlight/segmen/:nomor` | Ubah satu segmen (nomor mulai dari 1), validasi ulang, tulis ulang file |
+| DELETE | `/api/projects/:id/highlight/segmen/:nomor` | Hapus satu segmen, validasi ulang, tulis ulang file |
 | GET | `/api/projects/:id/narasi` | Unduh `narasi.txt` |
 | POST | `/api/projects/:id/open-folder` | Buka folder project di file manager |
 | POST | `/api/projects/:id/export` | Salin video, highlight.json, narasi.txt ke folder Premiere (job `export`) |
@@ -123,6 +125,38 @@ sequenceDiagram
         API->>FS: Tulis highlight.json dan narasi.txt
         API->>DB: project siap_premiere, has_highlight 1
         API-->>FE: 200 daftar segmen
+    end
+```
+
+## 3b. Ubah atau hapus segmen
+
+```mermaid
+sequenceDiagram
+    actor U as Pengguna
+    participant FE as Vue
+    participant API as Go API
+    participant FS as Folder project
+
+    alt Ubah
+        U->>FE: Klik Ubah, isi form, klik Simpan
+        FE->>API: PUT /api/projects/:id/highlight/segmen/:nomor {label, narasi, kategori, mulai, selesai}
+    else Hapus
+        U->>FE: Klik Hapus
+        FE-->>U: Konfirmasi SweetAlert
+        U->>FE: Ya, hapus
+        FE->>API: DELETE /api/projects/:id/highlight/segmen/:nomor
+    end
+    API->>FS: Baca highlight.json
+    alt Nomor segmen tidak ada
+        API-->>FE: 404 segment_not_found
+    end
+    API->>API: Ganti atau buang segmen, validasi seluruh highlight
+    alt Ada kesalahan
+        API-->>FE: 422 highlight_invalid dengan daftar kesalahan
+        FE-->>U: Tampilkan kesalahan di form
+    else Lolos
+        API->>FS: Tulis ulang highlight.json dan narasi.txt
+        API-->>FE: 200 highlight terbaru
     end
 ```
 

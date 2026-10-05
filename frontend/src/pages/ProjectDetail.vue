@@ -2,8 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getProject, getPrompt, openFolder, exportToFolder, retryDownload, retryTranscribe, transcriptUrl, videoUrl } from '../api/projects'
-import { listGameModes } from '../api/promptBlocks'
-import { saveHighlight, getHighlight, deleteHighlight, narasiUrl } from '../api/highlight'
+import { listGameModes, getPromptBlock } from '../api/promptBlocks'
+import { saveHighlight, getHighlight, deleteHighlight, narasiUrl, updateSegment, deleteSegment } from '../api/highlight'
 import { cancelJob } from '../api/jobs'
 import { getSettings } from '../api/settings'
 import { useNotify } from '../composables/useNotify'
@@ -37,6 +37,14 @@ const highlightErrors = ref([])
 const savingHighlight = ref(false)
 const deletingHighlight = ref(false)
 const savedHighlight = ref(null)
+const categories = ref([])
+
+// Segment edit form (SM-15): only one segment is edited at a time.
+const editingIndex = ref(-1)
+const segmentForm = ref({ label: '', narasi: '', kategori: '', mulai: '', selesai: '' })
+const segmentFormErrors = ref([])
+const savingSegment = ref(false)
+const deletingSegmentIndex = ref(-1)
 
 const videoEl = ref(null)
 const activeSegmentIndex = ref(-1)
@@ -81,6 +89,70 @@ async function loadHighlight() {
     }
     savedHighlight.value = null
   }
+  await loadCategories()
+}
+
+// Valid "kategori" values for the project's genre, for the segment edit
+// form. Non-critical: without them the field falls back to free text.
+async function loadCategories() {
+  const mode = gameModes.value.find((g) => g.code === project.value?.game_code)
+  if (!mode) return
+  try {
+    categories.value = (await getPromptBlock(mode.block_code)).categories || []
+  } catch (err) {
+    categories.value = []
+  }
+}
+
+function startEditSegment(index, s) {
+  editingIndex.value = index
+  segmentFormErrors.value = []
+  segmentForm.value = { label: s.label, narasi: s.narasi, kategori: s.kategori, mulai: s.mulai, selesai: s.selesai }
+}
+
+function cancelEditSegment() {
+  editingIndex.value = -1
+  segmentFormErrors.value = []
+}
+
+async function submitSegment() {
+  savingSegment.value = true
+  segmentFormErrors.value = []
+  try {
+    savedHighlight.value = await updateSegment(route.params.id, editingIndex.value + 1, segmentForm.value)
+    editingIndex.value = -1
+    success('Segmen disimpan')
+  } catch (err) {
+    // Validation errors stay in the form; nothing was written on the server.
+    if (err.code === 'highlight_invalid' && err.details) {
+      segmentFormErrors.value = err.details
+    } else {
+      segmentFormErrors.value = [{ segmen: 0, field: '', message: err.message }]
+    }
+  } finally {
+    savingSegment.value = false
+  }
+}
+
+async function removeSegment(index, s) {
+  const ok = await confirm({
+    title: `Hapus segmen ${index + 1}?`,
+    text: `"${s.label}" akan dihapus dari highlight.json dan narasi.txt.`,
+    confirmButtonText: 'Ya, hapus',
+  })
+  if (!ok) return
+  deletingSegmentIndex.value = index
+  try {
+    savedHighlight.value = await deleteSegment(route.params.id, index + 1)
+    if (editingIndex.value === index) cancelEditSegment()
+    else if (editingIndex.value > index) editingIndex.value -= 1
+    success('Segmen dihapus')
+  } catch (err) {
+    const detail = err.details?.[0]?.message
+    error(detail ? `${err.message}: ${detail}` : err.message)
+  } finally {
+    deletingSegmentIndex.value = -1
+  }
 }
 
 async function submitHighlight() {
@@ -88,6 +160,7 @@ async function submitHighlight() {
   highlightErrors.value = []
   try {
     savedHighlight.value = await saveHighlight(route.params.id, highlightBody.value)
+    cancelEditSegment()
     project.value = await getProject(route.params.id)
     success('Highlight tersimpan')
   } catch (err) {
@@ -441,18 +514,85 @@ onUnmounted(() => sse.close())
             <li
               v-for="(s, i) in savedHighlight.segmen"
               :key="i"
-              class="cursor-pointer rounded px-3 py-2 transition"
-              :class="i === activeSegmentIndex ? 'bg-emerald-900/50 ring-1 ring-emerald-500' : 'bg-slate-900 hover:bg-slate-800'"
-              @click="playSegment(i, s)"
+              class="rounded px-3 py-2 transition"
+              :class="
+                i === editingIndex
+                  ? 'bg-slate-900 ring-1 ring-slate-600'
+                  : i === activeSegmentIndex
+                    ? 'cursor-pointer bg-emerald-900/50 ring-1 ring-emerald-500'
+                    : 'cursor-pointer bg-slate-900 hover:bg-slate-800'
+              "
+              @click="i !== editingIndex && playSegment(i, s)"
             >
-              <p class="font-medium">
-                {{ i + 1 }}. [{{ s.mulai }} - {{ s.selesai }}] {{ s.label }}
-                <span class="rounded px-1.5 py-0.5 text-xs" :class="categoryColor(s.kategori)">{{ s.kategori }}</span>
-                <span class="text-xs text-slate-500">· {{ segmentDurationSec(s) }} detik</span>
-                <span v-if="i === activeSegmentIndex" class="text-xs text-emerald-400">&#9654; sedang diputar</span>
-              </p>
-              <p class="text-xs text-slate-400">{{ s.narasi }}</p>
-              <p v-for="(w, wi) in warningsForSegment(i)" :key="wi" class="text-xs text-amber-400">&#9888; {{ w.message }}</p>
+              <form v-if="i === editingIndex" class="flex flex-col gap-2" @submit.prevent="submitSegment">
+                <p class="font-medium">Ubah segmen {{ i + 1 }}</p>
+                <label class="flex flex-col gap-1">
+                  <span class="text-xs text-slate-400">Label</span>
+                  <input v-model="segmentForm.label" class="rounded bg-slate-800 px-3 py-1.5" />
+                </label>
+                <label class="flex flex-col gap-1">
+                  <span class="text-xs text-slate-400">Narasi</span>
+                  <textarea v-model="segmentForm.narasi" rows="3" class="rounded bg-slate-800 px-3 py-1.5"></textarea>
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-400">Kategori</span>
+                    <select v-if="categories.length" v-model="segmentForm.kategori" class="rounded bg-slate-800 px-3 py-1.5">
+                      <option v-if="!categories.includes(segmentForm.kategori)" :value="segmentForm.kategori">{{ segmentForm.kategori }}</option>
+                      <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+                    </select>
+                    <input v-else v-model="segmentForm.kategori" class="rounded bg-slate-800 px-3 py-1.5" />
+                  </label>
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-400">Mulai (HH:MM:SS)</span>
+                    <input v-model="segmentForm.mulai" class="rounded bg-slate-800 px-3 py-1.5 font-mono" />
+                  </label>
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-slate-400">Selesai (HH:MM:SS)</span>
+                    <input v-model="segmentForm.selesai" class="rounded bg-slate-800 px-3 py-1.5 font-mono" />
+                  </label>
+                </div>
+                <ul
+                  v-if="segmentFormErrors.length"
+                  class="flex flex-col gap-1 rounded border border-rose-800 bg-rose-950/40 p-2 text-xs text-rose-300"
+                >
+                  <li v-for="(e, ei) in segmentFormErrors" :key="ei">
+                    <template v-if="e.segmen">Segmen {{ e.segmen }}{{ e.field ? ` (${e.field})` : '' }}: </template>{{ e.message }}
+                  </li>
+                </ul>
+                <div class="flex gap-2">
+                  <button
+                    type="submit"
+                    :disabled="savingSegment"
+                    class="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                  >
+                    {{ savingSegment ? 'Menyimpan...' : 'Simpan' }}
+                  </button>
+                  <button type="button" class="rounded bg-slate-800 px-3 py-1.5 text-sm" @click="cancelEditSegment">Batal</button>
+                </div>
+              </form>
+              <template v-else>
+                <div class="flex items-start justify-between gap-2">
+                  <p class="font-medium">
+                    {{ i + 1 }}. [{{ s.mulai }} - {{ s.selesai }}] {{ s.label }}
+                    <span class="rounded px-1.5 py-0.5 text-xs" :class="categoryColor(s.kategori)">{{ s.kategori }}</span>
+                    <span class="text-xs text-slate-500">· {{ segmentDurationSec(s) }} detik</span>
+                    <span v-if="i === activeSegmentIndex" class="text-xs text-emerald-400">&#9654; sedang diputar</span>
+                  </p>
+                  <div class="flex shrink-0 gap-2 text-xs">
+                    <button class="rounded bg-slate-800 px-2 py-1 hover:bg-slate-700" @click.stop="startEditSegment(i, s)">Ubah</button>
+                    <button
+                      :disabled="deletingSegmentIndex === i"
+                      class="rounded bg-slate-800 px-2 py-1 text-rose-400 hover:bg-slate-700 disabled:opacity-50"
+                      @click.stop="removeSegment(i, s)"
+                    >
+                      {{ deletingSegmentIndex === i ? 'Menghapus...' : 'Hapus' }}
+                    </button>
+                  </div>
+                </div>
+                <p class="text-xs text-slate-400">{{ s.narasi }}</p>
+                <p v-for="(w, wi) in warningsForSegment(i)" :key="wi" class="text-xs text-amber-400">&#9888; {{ w.message }}</p>
+              </template>
             </li>
           </ul>
           <div class="flex gap-4 text-sm">

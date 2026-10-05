@@ -109,6 +109,14 @@ Hapus project tersedia di semua status.
 3. Jika ada kesalahan, app menampilkan daftar kesalahan per segmen dan tidak menyimpan apa pun.
 4. Jika lolos, app menulis `highlight.json` (ditambah `video` dan `durasi`) dan `narasi.txt`, status project menjadi `siap_premiere`.
 
+### 4.5b Ubah dan hapus segmen
+
+1. Di daftar highlight, pengguna menekan "Ubah" pada satu segmen dan mengisi form: label, narasi, kategori, waktu mulai, waktu selesai. `alasan` tetap.
+2. App mengganti segmen itu di salinan highlight tersimpan, lalu memeriksa seluruh highlight dengan aturan 4.5 yang sama.
+3. Jika ada kesalahan, kesalahan tampil di form dan tidak ada file yang ditulis.
+4. Jika lolos, app menulis ulang `highlight.json` dan `narasi.txt`. Status project tetap `siap_premiere`.
+5. Hapus segmen meminta konfirmasi SweetAlert, lalu berjalan dengan langkah 2–4 yang sama. Segmen terakhir tidak bisa dihapus dengan cara ini (highlight tanpa segmen tidak lolos validasi); pakai "Hapus highlight".
+
 ### 4.5a Salin ke folder
 
 Tersedia begitu status project `siap_premiere`; tujuannya supaya project di app boleh dihapus tanpa membuat media offline di project Premiere.

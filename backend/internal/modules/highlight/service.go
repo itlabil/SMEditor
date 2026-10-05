@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"smeditor/internal/httpx"
 	"smeditor/internal/modules/project"
@@ -58,6 +59,68 @@ func (s *Service) Save(ctx context.Context, projectID, rawBody string) (*SavedHi
 		return nil, httpx.ErrUnprocessable("highlight_invalid", err.Error())
 	}
 
+	saved, err := s.validateAndWrite(ctx, p, h)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.writer.SetHighlightSaved(ctx, projectID); err != nil {
+		return nil, err
+	}
+	return saved, nil
+}
+
+// UpdateSegment replaces the editable fields of segment nomor (1-based,
+// as shown on screen) in the saved highlight, keeping its "alasan". The
+// whole highlight is re-checked with the same Validate used by Save; on
+// any error nothing is written, per SM-15.
+func (s *Service) UpdateSegment(ctx context.Context, projectID string, nomor int, in SegmentInput) (*SavedHighlight, error) {
+	p, h, err := s.loadForEdit(ctx, projectID, nomor)
+	if err != nil {
+		return nil, err
+	}
+	seg := &h.Segmen[nomor-1]
+	seg.Mulai = strings.TrimSpace(in.Mulai)
+	seg.Selesai = strings.TrimSpace(in.Selesai)
+	seg.Kategori = strings.TrimSpace(in.Kategori)
+	seg.Label = strings.TrimSpace(in.Label)
+	seg.Narasi = strings.TrimSpace(in.Narasi)
+	return s.validateAndWrite(ctx, p, h)
+}
+
+// DeleteSegment removes segment nomor (1-based) from the saved highlight
+// and rewrites highlight.json and narasi.txt. Removing the last
+// remaining segment fails validation ("Tidak ada segmen"); deleting the
+// whole highlight has its own endpoint.
+func (s *Service) DeleteSegment(ctx context.Context, projectID string, nomor int) (*SavedHighlight, error) {
+	p, h, err := s.loadForEdit(ctx, projectID, nomor)
+	if err != nil {
+		return nil, err
+	}
+	h.Segmen = append(h.Segmen[:nomor-1], h.Segmen[nomor:]...)
+	return s.validateAndWrite(ctx, p, h)
+}
+
+// loadForEdit reads the project and its saved highlight and checks that
+// segment nomor exists.
+func (s *Service) loadForEdit(ctx context.Context, projectID string, nomor int) (*project.Project, *Highlight, error) {
+	p, err := s.projects.Get(ctx, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	saved, err := s.Get(ctx, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if nomor < 1 || nomor > len(saved.Segmen) {
+		return nil, nil, httpx.ErrNotFound("segment_not_found", fmt.Sprintf("Segmen %d tidak ada", nomor))
+	}
+	return p, saved.toHighlight(), nil
+}
+
+// validateAndWrite runs Validate against the project's genre categories
+// and video duration and, only if there are no errors, writes
+// highlight.json and narasi.txt.
+func (s *Service) validateAndWrite(ctx context.Context, p *project.Project, h *Highlight) (*SavedHighlight, error) {
 	categories, err := s.categories.CategoriesForGame(ctx, p.GameCode)
 	if err != nil {
 		return nil, err
@@ -77,11 +140,11 @@ func (s *Service) Save(ctx context.Context, projectID, rawBody string) (*SavedHi
 		return nil, fmt.Errorf("susun highlight.json: %w", err)
 	}
 
-	highlightPath, err := s.storage.FilePath(projectID, storage.HighlightFile)
+	highlightPath, err := s.storage.FilePath(p.ID, storage.HighlightFile)
 	if err != nil {
 		return nil, err
 	}
-	narasiPath, err := s.storage.FilePath(projectID, storage.NarrationFile)
+	narasiPath, err := s.storage.FilePath(p.ID, storage.NarrationFile)
 	if err != nil {
 		return nil, err
 	}
@@ -90,10 +153,6 @@ func (s *Service) Save(ctx context.Context, projectID, rawBody string) (*SavedHi
 	}
 	if err := os.WriteFile(narasiPath, []byte(buildNarasi(h.Segmen)), 0o644); err != nil {
 		return nil, fmt.Errorf("simpan narasi.txt: %w", err)
-	}
-
-	if err := s.writer.SetHighlightSaved(ctx, projectID); err != nil {
-		return nil, err
 	}
 	return &saved, nil
 }

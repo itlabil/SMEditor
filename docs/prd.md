@@ -83,6 +83,7 @@ Status project di app web: `baru`, `mengunduh`, `transcript`, `menunggu highligh
 - Kesalahan ditunjukkan per segmen supaya bisa diperbaiki atau diminta ulang ke AI.
 - Hasil yang lolos ditampilkan sebagai daftar segmen untuk dibaca, lalu disimpan sebagai `highlight.json`.
 - Tiap segmen pada daftar bisa diputar sebagai pratinjau dari video asli, dari waktu mulai sampai selesai; hanya pemutaran, tanpa fitur edit (potong, susun ulang, dan export tetap dilakukan di Premiere).
+- Tiap segmen pada daftar bisa diubah lewat tombol "Ubah" (label, narasi, kategori, waktu mulai, waktu selesai) atau dihapus dengan konfirmasi SweetAlert. Perubahan diperiksa dengan validasi yang sama seperti saat menempel JSON; jika lolos, `highlight.json` dan `narasi.txt` ditulis ulang, jika tidak, kesalahan tampil di form dan file tidak berubah.
 - Script narasi dibuat dari JSON yang sama dan disimpan sebagai `narasi.txt`, berurutan per segmen.
 - Tombol buka folder project memudahkan menyalin video dan file highlight ke Premiere.
 

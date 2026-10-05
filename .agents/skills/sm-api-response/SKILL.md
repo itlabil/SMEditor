@@ -103,6 +103,7 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `prompt_block_not_found` | 404 | Kode blok prompt tidak dikenal |
 | `prompt_body_required` | 422 | Isi blok prompt kosong |
 | `highlight_missing` | 409 | `highlight.json` belum ada |
+| `segment_not_found` | 404 | Nomor segmen highlight di path (`:nomor`, mulai dari 1) tidak ada |
 | `unknown_setting_key` | 400 | Key pengaturan tidak dikenal |
 | `invalid_whisper_device` | 400 | `whisper_device` bukan `auto`, `cpu`, atau `gpu` |
 | `internal_error` | 500 | Kesalahan tak terduga |

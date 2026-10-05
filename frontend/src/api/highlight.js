@@ -15,3 +15,12 @@ export function deleteHighlight(id) {
 export function narasiUrl(id) {
   return `/api/projects/${id}/narasi`
 }
+
+// nomor is the 1-based segment number shown on screen.
+export function updateSegment(id, nomor, segment) {
+  return request('PUT', `/projects/${id}/highlight/segmen/${nomor}`, segment)
+}
+
+export function deleteSegment(id, nomor) {
+  return request('DELETE', `/projects/${id}/highlight/segmen/${nomor}`)
+}
