@@ -35,3 +35,7 @@ export function transcriptUrl(id, format) {
 export function getPrompt(id) {
   return request('GET', `/projects/${id}/prompt`)
 }
+
+export function openFolder(id) {
+  return request('POST', `/projects/${id}/open-folder`)
+}

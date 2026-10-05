@@ -21,6 +21,7 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	g.POST("/:id/transcribe", h.retryTranscribe)
 	g.GET("/:id/transcript", h.transcript)
 	g.GET("/:id/prompt", h.prompt)
+	g.POST("/:id/open-folder", h.openFolder)
 }
 
 func (h *Handler) list(c *gin.Context) {
@@ -114,4 +115,12 @@ func (h *Handler) prompt(c *gin.Context) {
 		return
 	}
 	httpx.OK(c, gin.H{"prompt": text})
+}
+
+func (h *Handler) openFolder(c *gin.Context) {
+	if err := h.svc.OpenFolder(c.Request.Context(), c.Param("id")); err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	httpx.NoContent(c)
 }

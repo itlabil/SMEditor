@@ -96,6 +96,30 @@ func (r *Repository) UpdateStatus(ctx context.Context, id, status, errorMessage 
 	return nil
 }
 
+// SetHighlightSaved marks a project siap_premiere with has_highlight=1,
+// per docs/flow.md section 3, after highlight.json/narasi.txt are
+// written.
+func (r *Repository) SetHighlightSaved(ctx context.Context, id string) error {
+	const q = `UPDATE projects SET status = ?, has_highlight = 1, error_message = '', updated_at = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, q, StatusSiapPremiere, formatTime(time.Now()), id)
+	if err != nil {
+		return fmt.Errorf("set highlight saved for %s: %w", id, err)
+	}
+	return nil
+}
+
+// ClearHighlight reverts a project to menunggu_highlight with
+// has_highlight=0, per docs/flow.md section 3 ("siap_premiere ->
+// menunggu_highlight: highlight dihapus atau diganti").
+func (r *Repository) ClearHighlight(ctx context.Context, id string) error {
+	const q = `UPDATE projects SET status = ?, has_highlight = 0, updated_at = ? WHERE id = ?`
+	_, err := r.db.ExecContext(ctx, q, StatusMenungguHighlight, formatTime(time.Now()), id)
+	if err != nil {
+		return fmt.Errorf("clear highlight for %s: %w", id, err)
+	}
+	return nil
+}
+
 // UpdateTranscriptLang sets the requested transcript language ("auto",
 // "id", "en", "tl", or any other whisper language code), used by
 // TranscribeRunner when it next runs.

@@ -167,3 +167,30 @@ func TestServiceAssemble_RealGameFromDB(t *testing.T) {
 		t.Errorf("Assemble() left an unresolved placeholder %q", m)
 	}
 }
+
+func TestServiceCategoriesForGame(t *testing.T) {
+	svc := newTestService(t)
+
+	got, err := svc.CategoriesForGame(context.Background(), "mlbb")
+	if err != nil {
+		t.Fatalf("CategoriesForGame: %v", err)
+	}
+	want := []string{"draft", "early", "mid", "end", "kesimpulan"}
+	if len(got) != len(want) {
+		t.Fatalf("got = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("got[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestServiceCategoriesForGame_UnknownGame(t *testing.T) {
+	svc := newTestService(t)
+
+	_, err := svc.CategoriesForGame(context.Background(), "not-a-real-game")
+	if err == nil {
+		t.Fatal("CategoriesForGame with unknown code: want error, got nil")
+	}
+}

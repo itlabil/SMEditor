@@ -44,15 +44,56 @@ type PromptAssembler interface {
 	Assemble(ctx context.Context, in prompt.AssembleInput) (string, error)
 }
 
+// FolderOpener opens a path in the OS's desktop file manager. Implemented
+// by tools.Opener.
+type FolderOpener interface {
+	OpenFolder(ctx context.Context, path string) error
+}
+
 type Service struct {
 	repo    *Repository
 	storage *storage.Storage
 	jobs    Jobs
 	prompt  PromptAssembler
+	opener  FolderOpener
 }
 
-func NewService(repo *Repository, st *storage.Storage, jobs Jobs, promptAssembler PromptAssembler) *Service {
-	return &Service{repo: repo, storage: st, jobs: jobs, prompt: promptAssembler}
+func NewService(repo *Repository, st *storage.Storage, jobs Jobs, promptAssembler PromptAssembler, opener FolderOpener) *Service {
+	return &Service{repo: repo, storage: st, jobs: jobs, prompt: promptAssembler, opener: opener}
+}
+
+// OpenFolder opens a project's data folder in the OS's file manager, so
+// the user can copy the source video and highlight.json into Premiere's
+// project folder.
+func (s *Service) OpenFolder(ctx context.Context, id string) error {
+	if _, err := s.findByID(ctx, id); err != nil {
+		return err
+	}
+	dir, err := s.storage.ProjectDir(id)
+	if err != nil {
+		return err
+	}
+	return s.opener.OpenFolder(ctx, dir)
+}
+
+// SetHighlightSaved marks a project siap_premiere with has_highlight=1,
+// called by the highlight module after it writes highlight.json and
+// narasi.txt.
+func (s *Service) SetHighlightSaved(ctx context.Context, id string) error {
+	if _, err := s.findByID(ctx, id); err != nil {
+		return err
+	}
+	return s.repo.SetHighlightSaved(ctx, id)
+}
+
+// ClearHighlight reverts a project to menunggu_highlight with
+// has_highlight=0, called by the highlight module after it deletes
+// highlight.json and narasi.txt.
+func (s *Service) ClearHighlight(ctx context.Context, id string) error {
+	if _, err := s.findByID(ctx, id); err != nil {
+		return err
+	}
+	return s.repo.ClearHighlight(ctx, id)
 }
 
 // Prompt assembles the AI prompt text for a project, per docs/prd.md.

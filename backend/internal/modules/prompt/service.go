@@ -80,3 +80,21 @@ func (s *Service) Assemble(ctx context.Context, in AssembleInput) (string, error
 
 	return assemble(*frame, *block, *gm, in), nil
 }
+
+// CategoriesForGame returns the valid highlight categories for a game's
+// genre block, used by the highlight module to validate a segment's
+// "kategori" field, per docs/flow.md section 4.5.
+func (s *Service) CategoriesForGame(ctx context.Context, gameCode string) ([]string, error) {
+	gm, err := s.repo.FindGameMode(ctx, gameCode)
+	if errors.Is(err, ErrGameNotFound) {
+		return nil, httpx.ErrUnprocessable("game_not_found", "Kode game tidak dikenal")
+	}
+	if err != nil {
+		return nil, err
+	}
+	block, err := s.repo.FindBlock(ctx, gm.BlockCode)
+	if err != nil {
+		return nil, err
+	}
+	return block.Categories, nil
+}

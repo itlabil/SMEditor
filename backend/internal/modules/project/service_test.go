@@ -26,6 +26,16 @@ func (f *fakePromptAssembler) Assemble(ctx context.Context, in prompt.AssembleIn
 	return f.text, nil
 }
 
+type fakeFolderOpener struct {
+	openedPath string
+	err        error
+}
+
+func (f *fakeFolderOpener) OpenFolder(ctx context.Context, path string) error {
+	f.openedPath = path
+	return f.err
+}
+
 type fakeJobs struct {
 	calledForProject string // last CancelAllForProject target
 	enqueued         []string
@@ -70,7 +80,7 @@ func newTestServiceWithJobs(t *testing.T) (*Service, *fakeJobs) {
 	repo := NewRepository(conn)
 	st := storage.New(t.TempDir())
 	jobs := &fakeJobs{}
-	return NewService(repo, st, jobs, &fakePromptAssembler{text: "prompt palsu"}), jobs
+	return NewService(repo, st, jobs, &fakePromptAssembler{text: "prompt palsu"}, &fakeFolderOpener{}), jobs
 }
 
 func validRequest() CreateRequest {
@@ -445,5 +455,48 @@ func TestServiceTranscriptPath_ReturnsPathWhenPresent(t *testing.T) {
 	}
 	if got != path || filename != "transcript.txt" {
 		t.Errorf("TranscriptPath = (%q, %q), want (%q, %q)", got, filename, path, "transcript.txt")
+	}
+}
+
+func TestServiceOpenFolder_OpensTheProjectDir(t *testing.T) {
+	conn, err := db.Open(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	if err := db.Migrate(context.Background(), conn); err != nil {
+		t.Fatalf("db.Migrate: %v", err)
+	}
+	repo := NewRepository(conn)
+	st := storage.New(t.TempDir())
+	opener := &fakeFolderOpener{}
+	svc := NewService(repo, st, &fakeJobs{}, &fakePromptAssembler{}, opener)
+
+	p, err := svc.Create(context.Background(), validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if err := svc.OpenFolder(context.Background(), p.ID); err != nil {
+		t.Fatalf("OpenFolder: %v", err)
+	}
+	wantDir, err := st.ProjectDir(p.ID)
+	if err != nil {
+		t.Fatalf("ProjectDir: %v", err)
+	}
+	if opener.openedPath != wantDir {
+		t.Errorf("opened path = %q, want %q", opener.openedPath, wantDir)
+	}
+}
+
+func TestServiceOpenFolder_NotFound(t *testing.T) {
+	svc := newTestService(t)
+
+	err := svc.OpenFolder(context.Background(), "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	if err == nil {
+		t.Fatal("OpenFolder with unknown id: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "project_not_found" {
+		t.Errorf("code = %q, want project_not_found", code)
 	}
 }

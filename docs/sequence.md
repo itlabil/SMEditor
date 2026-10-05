@@ -18,6 +18,7 @@ Semua respons API berformat JSON: `{"data": ...}` saat berhasil, `{"error": {"co
 | GET | `/api/projects/:id/transcript?format=txt\|json` | Unduh transcript |
 | GET | `/api/projects/:id/prompt` | Prompt yang sudah dirakit |
 | POST | `/api/projects/:id/highlight` | Validasi dan simpan highlight |
+| GET | `/api/projects/:id/highlight` | Baca highlight yang sudah tersimpan |
 | DELETE | `/api/projects/:id/highlight` | Hapus highlight |
 | GET | `/api/projects/:id/narasi` | Unduh `narasi.txt` |
 | POST | `/api/projects/:id/open-folder` | Buka folder project di file manager |

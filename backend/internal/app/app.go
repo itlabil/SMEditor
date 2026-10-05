@@ -12,6 +12,7 @@ import (
 
 	"smeditor/internal/db"
 	"smeditor/internal/httpx"
+	"smeditor/internal/modules/highlight"
 	"smeditor/internal/modules/job"
 	"smeditor/internal/modules/project"
 	"smeditor/internal/modules/prompt"
@@ -70,8 +71,11 @@ func NewRouter(ctx context.Context, conn *sql.DB, st *storage.Storage) (*gin.Eng
 	}
 	jobWorker.Start(ctx)
 
-	projectSvc := project.NewService(projectRepo, st, jobSvc, promptSvc)
+	projectSvc := project.NewService(projectRepo, st, jobSvc, promptSvc, tools.Opener{})
 	project.NewHandler(projectSvc).Register(api)
+
+	highlightSvc := highlight.NewService(st, projectSvc, projectSvc, promptSvc)
+	highlight.NewHandler(highlightSvc).Register(api)
 
 	registerFrontend(r)
 
