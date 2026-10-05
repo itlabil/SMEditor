@@ -276,6 +276,21 @@ func (s *Service) ThumbnailPath(ctx context.Context, id string) (string, error) 
 	return s.storage.FilePath(id, storage.ThumbnailFile)
 }
 
+// VideoPath returns the absolute path to a project's source video, for
+// the handler to serve directly as a file (c.File uses http.ServeContent
+// under the hood, which already handles HTTP Range requests, needed for
+// the segment preview player to seek without downloading the whole
+// file).
+func (s *Service) VideoPath(ctx context.Context, id string) (string, error) {
+	if _, err := s.findByID(ctx, id); err != nil {
+		return "", err
+	}
+	if !s.storage.Stat(id, storage.SourceVideoFile) {
+		return "", httpx.ErrNotFound("video_not_found", "Video belum tersedia")
+	}
+	return s.storage.FilePath(id, storage.SourceVideoFile)
+}
+
 func (s *Service) findByID(ctx context.Context, id string) (*Project, error) {
 	if !storage.ValidID(id) {
 		return nil, httpx.ErrBadRequest("invalid_id", "ID project tidak valid")

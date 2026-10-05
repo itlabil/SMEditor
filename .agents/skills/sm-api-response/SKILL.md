@@ -94,6 +94,7 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `highlight_invalid` | 422 | JSON highlight melanggar aturan |
 | `tool_not_found` | 409 | yt-dlp, ffmpeg, atau Whisper tidak ditemukan |
 | `thumbnail_not_found` | 404 | Thumbnail project belum tersedia |
+| `video_not_found` | 404 | Video project belum tersedia |
 | `invalid_format` | 400 | Parameter `format` bukan `txt` atau `json` |
 | `prompt_block_not_found` | 404 | Kode blok prompt tidak dikenal |
 | `prompt_body_required` | 422 | Isi blok prompt kosong |
@@ -109,6 +110,7 @@ Sebelum membuat kode baru, periksa tabel ini. Jika menambah, tambahkan juga bari
 - `GET /api/projects/:id/events` adalah SSE (`text/event-stream`). Tiap event berisi JSON: `{"type":"progress|done|failed","job_id":"...","progress":42.5,"message":"..."}`.
 - Endpoint unduh file (`transcript`, `narasi`) mengembalikan isi file dengan header `Content-Disposition`. Jika gagal, tetap mengembalikan bentuk error JSON.
 - `GET /api/projects/:id/thumbnail` mengembalikan isi file gambar langsung (`Content-Type: image/jpeg`), bukan bentuk `{"data": ...}`. Jika gagal, tetap mengembalikan bentuk error JSON.
+- `GET /api/projects/:id/video` mengembalikan isi `source.mp4` langsung lewat `c.File` (`http.ServeContent`), yang otomatis mendukung header `Range` untuk seek di pemutar video tanpa mengunduh seluruh file.
 
 ## Frontend
 

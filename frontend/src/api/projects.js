@@ -24,6 +24,10 @@ export function thumbnailUrl(id) {
   return `/api/projects/${id}/thumbnail`
 }
 
+export function videoUrl(id) {
+  return `/api/projects/${id}/video`
+}
+
 export function retryTranscribe(id, transcriptLang) {
   return request('POST', `/projects/${id}/transcribe`, { transcript_lang: transcriptLang })
 }

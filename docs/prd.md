@@ -22,13 +22,14 @@ Versi 1 mencakup highlight landscape 16:9, dengan pemotongan dilakukan plugin di
 
 | App web | Plugin Premiere | Di luar versi 1 |
 | --- | --- | --- |
-| Project: buat, daftar, buka, hapus | Pilih video asli dan file highlight | Editor timeline dan export di web |
+| Project: buat, daftar, buka, hapus | Pilih video asli dan file highlight | Editor timeline (potong, susun ulang) dan export di web |
 | Download video 1080p, fallback 720p | Buat sequence sesuai resolusi dan fps video | Mode short 9:16 |
 | Transcript multi-bahasa dengan timestamp | Susun potongan otomatis dengan tambahan waktu dan jeda | Panggilan API AI otomatis |
 | Unduh transcript `.json` dan `.txt` | Marker berisi label dan narasi per potongan | Dubbing, musik, transisi otomatis |
 | Template prompt yang bisa disalin | Laporan segmen yang dilewati | Login, multi-user, hosting publik |
 | Validasi JSON highlight, simpan sebagai file |  |  |
 | Unduh script narasi `.txt` |  |  |
+| Pratinjau video per segmen highlight (tanpa edit) |  |  |
 
 ## Alur pengguna
 
@@ -81,6 +82,7 @@ Status project di app web: `baru`, `mengunduh`, `transcript`, `menunggu highligh
 - Validasi: skema benar, `mulai` lebih kecil dari `selesai`, waktu tidak melewati durasi video, segmen tidak tumpang tindih.
 - Kesalahan ditunjukkan per segmen supaya bisa diperbaiki atau diminta ulang ke AI.
 - Hasil yang lolos ditampilkan sebagai daftar segmen untuk dibaca, lalu disimpan sebagai `highlight.json`.
+- Tiap segmen pada daftar bisa diputar sebagai pratinjau dari video asli, dari waktu mulai sampai selesai; hanya pemutaran, tanpa fitur edit (potong, susun ulang, dan export tetap dilakukan di Premiere).
 - Script narasi dibuat dari JSON yang sama dan disimpan sebagai `narasi.txt`, berurutan per segmen.
 - Tombol buka folder project memudahkan menyalin video dan file highlight ke Premiere.
 

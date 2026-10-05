@@ -11,6 +11,7 @@ Semua respons API berformat JSON: `{"data": ...}` saat berhasil, `{"error": {"co
 | GET | `/api/projects/:id` | Detail project dan job terakhir |
 | DELETE | `/api/projects/:id` | Hapus project dan semua filenya |
 | GET | `/api/projects/:id/thumbnail` | Gambar thumbnail project |
+| GET | `/api/projects/:id/video` | Video asli project, mendukung `Range` untuk pratinjau segmen |
 | POST | `/api/projects/:id/download` | Ulangi unduh |
 | POST | `/api/projects/:id/transcribe` | Ulangi transcript (body: bahasa) |
 | POST | `/api/jobs/:id/cancel` | Batalkan job |

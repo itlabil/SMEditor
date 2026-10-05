@@ -17,6 +17,7 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	g.GET("/:id", h.get)
 	g.DELETE("/:id", h.delete)
 	g.GET("/:id/thumbnail", h.thumbnail)
+	g.GET("/:id/video", h.video)
 	g.POST("/:id/download", h.retryDownload)
 	g.POST("/:id/transcribe", h.retryTranscribe)
 	g.GET("/:id/transcript", h.transcript)
@@ -66,6 +67,15 @@ func (h *Handler) delete(c *gin.Context) {
 
 func (h *Handler) thumbnail(c *gin.Context) {
 	path, err := h.svc.ThumbnailPath(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.File(path)
+}
+
+func (h *Handler) video(c *gin.Context) {
+	path, err := h.svc.VideoPath(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		httpx.Fail(c, err)
 		return

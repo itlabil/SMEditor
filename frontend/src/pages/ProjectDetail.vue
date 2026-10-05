@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { getProject, getPrompt, openFolder, retryDownload, retryTranscribe, transcriptUrl } from '../api/projects'
+import { getProject, getPrompt, openFolder, retryDownload, retryTranscribe, transcriptUrl, videoUrl } from '../api/projects'
 import { listGameModes } from '../api/promptBlocks'
 import { saveHighlight, getHighlight, deleteHighlight, narasiUrl } from '../api/highlight'
 import { useNotify } from '../composables/useNotify'
@@ -29,6 +29,10 @@ const highlightErrors = ref([])
 const savingHighlight = ref(false)
 const deletingHighlight = ref(false)
 const savedHighlight = ref(null)
+
+const videoEl = ref(null)
+const activeSegmentIndex = ref(-1)
+let stopAtSeconds = null
 
 const pastDownload = computed(() =>
   ['transcript', 'gagal_transcript', 'menunggu_highlight', 'siap_premiere'].includes(project.value?.status),
@@ -125,6 +129,36 @@ function formatHMS(totalSec) {
   const s = total % 60
   const pad = (v) => String(v).padStart(2, '0')
   return `${pad(h)}:${pad(m)}:${pad(s)}`
+}
+
+function parseHMS(s) {
+  const [h, m, sec] = s.split(':').map(Number)
+  return h * 3600 + m * 60 + sec
+}
+
+// Plays the video from segment s's "mulai" and stops it at "selesai" —
+// preview only, no editing. onVideoPause clears the active marker so it
+// only shows while actually playing (not once it stops at the boundary
+// or the user pauses manually).
+function playSegment(index, s) {
+  const video = videoEl.value
+  if (!video) return
+  stopAtSeconds = parseHMS(s.selesai)
+  activeSegmentIndex.value = index
+  video.currentTime = parseHMS(s.mulai)
+  video.play()
+}
+
+function onVideoTimeUpdate() {
+  const video = videoEl.value
+  if (stopAtSeconds !== null && video && video.currentTime >= stopAtSeconds) {
+    video.pause()
+    stopAtSeconds = null
+  }
+}
+
+function onVideoPause() {
+  activeSegmentIndex.value = -1
 }
 
 async function copyPrompt() {
@@ -276,14 +310,30 @@ onUnmounted(() => sse.close())
         <h2 class="text-lg font-semibold">Highlight</h2>
 
         <template v-if="savedHighlight">
+          <video
+            ref="videoEl"
+            :src="videoUrl(project.id)"
+            controls
+            class="w-full rounded bg-black"
+            @timeupdate="onVideoTimeUpdate"
+            @pause="onVideoPause"
+          ></video>
+
           <p class="text-sm text-slate-400">
             {{ savedHighlight.segmen.length }} segmen · total durasi highlight {{ formatHMS(savedHighlight.total_durasi_sec) }}
           </p>
           <ul class="flex flex-col gap-2 text-sm">
-            <li v-for="(s, i) in savedHighlight.segmen" :key="i" class="rounded bg-slate-900 px-3 py-2">
+            <li
+              v-for="(s, i) in savedHighlight.segmen"
+              :key="i"
+              class="cursor-pointer rounded px-3 py-2 transition"
+              :class="i === activeSegmentIndex ? 'bg-emerald-900/50 ring-1 ring-emerald-500' : 'bg-slate-900 hover:bg-slate-800'"
+              @click="playSegment(i, s)"
+            >
               <p class="font-medium">
                 {{ i + 1 }}. [{{ s.mulai }} - {{ s.selesai }}] {{ s.label }}
                 <span class="text-xs text-slate-500">({{ s.kategori }})</span>
+                <span v-if="i === activeSegmentIndex" class="text-xs text-emerald-400">&#9654; sedang diputar</span>
               </p>
               <p class="text-xs text-slate-400">{{ s.narasi }}</p>
             </li>

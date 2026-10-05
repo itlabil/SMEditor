@@ -500,3 +500,46 @@ func TestServiceOpenFolder_NotFound(t *testing.T) {
 		t.Errorf("code = %q, want project_not_found", code)
 	}
 }
+
+func TestServiceVideoPath_MissingReturnsNotFound(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	_, err = svc.VideoPath(ctx, p.ID)
+	if err == nil {
+		t.Fatal("VideoPath before download: want error, got nil")
+	}
+	if code := appErrCode(t, err); code != "video_not_found" {
+		t.Errorf("code = %q, want video_not_found", code)
+	}
+}
+
+func TestServiceVideoPath_ReturnsPathWhenPresent(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	p, err := svc.Create(ctx, validRequest())
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	path, err := svc.storage.FilePath(p.ID, storage.SourceVideoFile)
+	if err != nil {
+		t.Fatalf("FilePath: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("fake video bytes"), 0o644); err != nil {
+		t.Fatalf("seed source.mp4: %v", err)
+	}
+
+	got, err := svc.VideoPath(ctx, p.ID)
+	if err != nil {
+		t.Fatalf("VideoPath: %v", err)
+	}
+	if got != path {
+		t.Errorf("VideoPath = %q, want %q", got, path)
+	}
+}
