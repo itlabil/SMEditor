@@ -93,6 +93,8 @@ Paket `httpx` tidak mengimpor `gin` di tipe `AppError`, sehingga service boleh m
 | `transcript_missing` | 409 | Transcript belum ada |
 | `highlight_invalid` | 422 | JSON highlight melanggar aturan |
 | `tool_not_found` | 409 | yt-dlp, ffmpeg, atau Whisper tidak ditemukan |
+| `unknown_setting_key` | 400 | Key pengaturan tidak dikenal |
+| `invalid_whisper_device` | 400 | `whisper_device` bukan `auto`, `cpu`, atau `gpu` |
 | `internal_error` | 500 | Kesalahan tak terduga |
 
 Sebelum membuat kode baru, periksa tabel ini. Jika menambah, tambahkan juga barisnya di sini.

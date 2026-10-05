@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { checkHealth } from '../api/health'
 
 const status = ref('memeriksa...')
@@ -18,5 +19,6 @@ onMounted(async () => {
   <main class="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 text-slate-100">
     <h1 class="text-2xl font-semibold">SMEditor</h1>
     <p class="text-slate-400">Status backend: <span class="font-mono text-emerald-400">{{ status }}</span></p>
+    <RouterLink to="/settings" class="text-emerald-400 underline">Pengaturan</RouterLink>
   </main>
 </template>

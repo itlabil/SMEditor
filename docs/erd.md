@@ -100,8 +100,8 @@ erDiagram
 | Key | Contoh nilai |
 |---|---|
 | `ytdlp_path` | `tools/yt-dlp` |
-| `ffmpeg_path` | `tools/ffmpeg` |
-| `ffprobe_path` | `tools/ffprobe` |
+| `ffmpeg_path` | `ffmpeg` |
+| `ffprobe_path` | `ffprobe` |
 | `whisper_path` | `tools/whisper-cli` |
 | `whisper_model` | `tools/models/ggml-medium.bin` |
 | `whisper_device` | `auto`, `cpu`, atau `gpu` |

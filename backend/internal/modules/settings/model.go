@@ -1,0 +1,35 @@
+package settings
+
+// Keys match the settings table rows documented in docs/erd.md.
+const (
+	KeyYtdlpPath     = "ytdlp_path"
+	KeyFfmpegPath    = "ffmpeg_path"
+	KeyFfprobePath   = "ffprobe_path"
+	KeyWhisperPath   = "whisper_path"
+	KeyWhisperModel  = "whisper_model"
+	KeyWhisperDevice = "whisper_device"
+)
+
+// defaults are used for any key not yet saved in the settings table.
+// ffmpeg and ffprobe default to bare names resolved from the system PATH;
+// yt-dlp and whisper ship as bundled binaries under tools/.
+var defaults = map[string]string{
+	KeyYtdlpPath:     "tools/yt-dlp",
+	KeyFfmpegPath:    "ffmpeg",
+	KeyFfprobePath:   "ffprobe",
+	KeyWhisperPath:   "tools/whisper-cli",
+	KeyWhisperModel:  "tools/models/ggml-medium.bin",
+	KeyWhisperDevice: "auto",
+}
+
+var validWhisperDevices = map[string]bool{"auto": true, "cpu": true, "gpu": true}
+
+// CheckResult reports one tool's check outcome. Path is the final resolved
+// path that was actually used (after PATH lookup or BaseDir join), not the
+// raw settings value.
+type CheckResult struct {
+	Tool    string `json:"tool"`
+	Path    string `json:"path"`
+	Found   bool   `json:"found"`
+	Version string `json:"version"`
+}

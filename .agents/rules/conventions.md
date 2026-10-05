@@ -17,6 +17,11 @@
 - SQLite memakai `modernc.org/sqlite`. Tidak boleh ada dependensi CGO.
 - Proses luar dijalankan dengan `exec.CommandContext` dan argumen terpisah; tidak pernah lewat shell.
 - Path selalu disusun dengan `filepath.Join`. Tidak ada path atau nama executable yang ditulis tetap; ambil dari settings.
+- Path tool dari settings (`ytdlp_path`, `ffmpeg_path`, dst.) diselesaikan lewat `internal/tools.ResolveExecutable`, tidak pernah dengan `filepath.Join` atau `exec.Command` langsung di modul lain:
+  - nilai tanpa pemisah folder (`ffmpeg`) dicari di PATH sistem lewat `exec.LookPath`;
+  - path absolut dipakai apa adanya;
+  - path relatif (`tools/yt-dlp`) digabung ke `tools.BaseDir`, bukan working directory proses saat berjalan.
+  `tools.BaseDir` diisi sekali saat start dari root project yang sudah diresolve (`app.Config.BaseDir`, dasar yang sama dipakai `DataDir`), supaya hasilnya sama walau binary dijalankan dari folder mana pun.
 - Tes memakai table-driven test dari paket `testing`.
 
 ## Vue
