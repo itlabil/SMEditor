@@ -3,7 +3,7 @@
 (function () {
   'use strict';
 
-  var state = { jsonPath: '', videoPath: '', data: null, valid: [], problems: [] };
+  var state = { jsonPath: '', videoPath: '', baseName: '', data: null, valid: [], problems: [] };
 
   function $(id) { return document.getElementById(id); }
 
@@ -57,6 +57,17 @@
   function joinPath(dir, name) {
     var sep = dir.indexOf('\\') !== -1 ? '\\' : '/';
     return dir + sep + name;
+  }
+
+  // Nama dasar untuk sequence dan subtitle. "Nama Project.highlight.json" menjadi "Nama Project".
+  // File lama bernama "highlight.json" memakai nama foldernya.
+  function baseNameOf(jsonPath) {
+    var file = jsonPath.replace(/^.*[\\\/]/, '');
+    var base = file.replace(/\.highlight\.json$/i, '').replace(/\.json$/i, '');
+    if (!base || base.toLowerCase() === 'highlight') {
+      base = dirName(jsonPath).replace(/^.*[\\\/]/, '');
+    }
+    return base;
   }
 
   function parseTime(text) {
@@ -235,8 +246,8 @@
     } catch (e) {
       showMessage('highlight.json tidak bisa dibaca: ' + e.message);
     }
-    var folder = dirName(path).replace(/^.*[\\\/]/, '');
-    $('seq-name').value = 'Highlight - ' + folder;
+    state.baseName = baseNameOf(path);
+    $('seq-name').value = 'Highlight - ' + state.baseName;
     $('report').hidden = true;
     render();
   }
@@ -365,13 +376,14 @@
     var srt = buildSrt(clips);
     if (!srt.count) { addReport('Subtitle tidak dibuat: tidak ada narasi.', true); return; }
 
-    var path = joinPath(dirName(state.jsonPath), 'subtitle.srt');
+    var srtName = state.baseName + '.srt';
+    var path = joinPath(dirName(state.jsonPath), srtName);
     var res = window.cep.fs.writeFile(path, srt.text);
     if (res.err !== window.cep.fs.NO_ERROR) {
-      addReport('subtitle.srt gagal ditulis (kode ' + res.err + ').', true);
+      addReport(srtName + ' gagal ditulis (kode ' + res.err + ').', true);
       return;
     }
-    addReport('subtitle.srt dibuat: ' + srt.count + ' baris, di ' + path);
+    addReport(srtName + ' dibuat: ' + srt.count + ' baris, di ' + path);
 
     evalHost('smeImportFile(' + toLiteral(path) + ')').then(function (r) {
       if (r.ok && r.data.imported) {
