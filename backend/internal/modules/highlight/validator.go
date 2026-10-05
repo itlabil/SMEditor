@@ -121,6 +121,43 @@ func Validate(h *Highlight, durationSec float64, validCategories []string) []Val
 	return errs
 }
 
+const (
+	minSegmentDurationSec = 15.0
+	maxSegmentDurationSec = 150.0
+)
+
+// Warnings flags segments whose duration is unusually short (<15s) or
+// long (>150s). Unlike Validate, these never block saving - Save calls
+// this only after Validate has already passed, purely so the segment
+// list can flag them for the user to double-check manually.
+func Warnings(h *Highlight) []ValidationError {
+	warnings := []ValidationError{}
+	for i, seg := range h.Segmen {
+		start, startOK := parseHMS(seg.Mulai)
+		end, endOK := parseHMS(seg.Selesai)
+		if !startOK || !endOK {
+			continue // Validate already flags a bad format; don't double up
+		}
+
+		dur := end - start
+		switch {
+		case dur < minSegmentDurationSec:
+			warnings = append(warnings, ValidationError{
+				Segmen:  i + 1,
+				Field:   "durasi",
+				Message: fmt.Sprintf("Durasi %.0f detik, lebih pendek dari %g detik", dur, minSegmentDurationSec),
+			})
+		case dur > maxSegmentDurationSec:
+			warnings = append(warnings, ValidationError{
+				Segmen:  i + 1,
+				Field:   "durasi",
+				Message: fmt.Sprintf("Durasi %.0f detik, lebih panjang dari %g detik", dur, maxSegmentDurationSec),
+			})
+		}
+	}
+	return warnings
+}
+
 func parseHMS(s string) (float64, bool) {
 	m := timePattern.FindStringSubmatch(s)
 	if m == nil {

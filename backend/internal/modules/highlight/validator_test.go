@@ -1,6 +1,9 @@
 package highlight
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestStripCodeFence(t *testing.T) {
 	cases := []struct {
@@ -313,6 +316,96 @@ func TestParseHMS(t *testing.T) {
 				t.Errorf("parseHMS(%q) = %v, want %v", tc.in, got, tc.want)
 			}
 		})
+	}
+}
+
+func segmentWithDuration(mulai string, durationSec int) Segment {
+	start, _ := parseHMS(mulai)
+	end := start + float64(durationSec)
+	h := int(end) / 3600
+	m := (int(end) % 3600) / 60
+	s := int(end) % 60
+	selesai := fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+	return Segment{Mulai: mulai, Selesai: selesai, Kategori: "draft", Label: "L", Alasan: "x", Narasi: "y"}
+}
+
+func TestWarnings_TooShortSegment(t *testing.T) {
+	h := &Highlight{Segmen: []Segment{segmentWithDuration("00:00:00", 10)}}
+
+	warnings := Warnings(h)
+	if len(warnings) != 1 || warnings[0].Segmen != 1 || warnings[0].Field != "durasi" {
+		t.Fatalf("Warnings() = %+v, want one durasi warning for segment 1", warnings)
+	}
+}
+
+func TestWarnings_TooLongSegment(t *testing.T) {
+	h := &Highlight{Segmen: []Segment{segmentWithDuration("00:00:00", 200)}}
+
+	warnings := Warnings(h)
+	if len(warnings) != 1 || warnings[0].Segmen != 1 || warnings[0].Field != "durasi" {
+		t.Fatalf("Warnings() = %+v, want one durasi warning for segment 1", warnings)
+	}
+}
+
+func TestWarnings_BoundariesAreNotWarnings(t *testing.T) {
+	h := &Highlight{Segmen: []Segment{
+		segmentWithDuration("00:00:00", 15),  // exactly the minimum: allowed
+		segmentWithDuration("00:10:00", 150), // exactly the maximum: allowed
+	}}
+
+	warnings := Warnings(h)
+	if len(warnings) != 0 {
+		t.Errorf("Warnings() = %+v, want none for durations exactly at the 15s/150s boundaries", warnings)
+	}
+}
+
+func TestWarnings_NormalDurationHasNoWarning(t *testing.T) {
+	h := &Highlight{Segmen: []Segment{segmentWithDuration("00:00:00", 60)}}
+
+	warnings := Warnings(h)
+	if len(warnings) != 0 {
+		t.Errorf("Warnings() = %+v, want none for a normal 60s segment", warnings)
+	}
+}
+
+func TestWarnings_SkipsSegmentWithUnparsableTime(t *testing.T) {
+	h := &Highlight{Segmen: []Segment{
+		{Mulai: "garbage", Selesai: "00:00:05", Kategori: "draft", Label: "L", Alasan: "x", Narasi: "y"},
+	}}
+
+	warnings := Warnings(h)
+	if len(warnings) != 0 {
+		t.Errorf("Warnings() = %+v, want none when the time can't be parsed (Validate already flags that)", warnings)
+	}
+}
+
+func TestWarnings_ReportsCorrectSegmentNumberAmongMultiple(t *testing.T) {
+	h := &Highlight{Segmen: []Segment{
+		segmentWithDuration("00:00:00", 60),  // segment 1: fine
+		segmentWithDuration("00:02:00", 5),   // segment 2: too short
+		segmentWithDuration("00:03:00", 60),  // segment 3: fine
+		segmentWithDuration("00:05:00", 300), // segment 4: too long
+	}}
+
+	warnings := Warnings(h)
+	if len(warnings) != 2 {
+		t.Fatalf("Warnings() = %+v, want exactly 2", warnings)
+	}
+	if warnings[0].Segmen != 2 {
+		t.Errorf("warnings[0].Segmen = %d, want 2", warnings[0].Segmen)
+	}
+	if warnings[1].Segmen != 4 {
+		t.Errorf("warnings[1].Segmen = %d, want 4", warnings[1].Segmen)
+	}
+}
+
+func TestValidate_ShortOrLongSegmentsAreNotRejected(t *testing.T) {
+	h := validHighlight()
+	h.Segmen = []Segment{segmentWithDuration("00:00:00", 5)} // way under 15s
+
+	errs := Validate(h, 3600, mobaCategories)
+	if len(errs) != 0 {
+		t.Errorf("Validate() = %+v, want no errors: short/long duration is a warning, not a validation rule", errs)
 	}
 }
 

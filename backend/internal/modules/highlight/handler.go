@@ -22,15 +22,22 @@ type saveRequest struct {
 	Body string `json:"body"`
 }
 
-// response adds a display-only computed field on top of SavedHighlight,
-// without polluting the on-disk highlight.json format.
+// response adds display-only computed fields on top of SavedHighlight,
+// without polluting the on-disk highlight.json format. Peringatan flags
+// segments with an unusually short/long duration; unlike validation
+// errors, these never block saving (see Warnings).
 type response struct {
 	SavedHighlight
-	TotalDurasiSec float64 `json:"total_durasi_sec"`
+	TotalDurasiSec float64           `json:"total_durasi_sec"`
+	Peringatan     []ValidationError `json:"peringatan"`
 }
 
 func toResponse(saved *SavedHighlight) response {
-	return response{SavedHighlight: *saved, TotalDurasiSec: TotalDuration(saved.Segmen)}
+	return response{
+		SavedHighlight: *saved,
+		TotalDurasiSec: TotalDuration(saved.Segmen),
+		Peringatan:     Warnings(&Highlight{Segmen: saved.Segmen}),
+	}
 }
 
 func (h *Handler) save(c *gin.Context) {

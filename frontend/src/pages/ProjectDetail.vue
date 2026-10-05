@@ -161,6 +161,12 @@ function onVideoPause() {
   activeSegmentIndex.value = -1
 }
 
+// savedHighlight.peringatan uses the same 1-based "segmen" numbering as
+// the validation error details.
+function warningsForSegment(index) {
+  return (savedHighlight.value?.peringatan || []).filter((w) => w.segmen === index + 1)
+}
+
 async function copyPrompt() {
   try {
     await navigator.clipboard.writeText(promptText.value)
@@ -336,6 +342,7 @@ onUnmounted(() => sse.close())
                 <span v-if="i === activeSegmentIndex" class="text-xs text-emerald-400">&#9654; sedang diputar</span>
               </p>
               <p class="text-xs text-slate-400">{{ s.narasi }}</p>
+              <p v-for="(w, wi) in warningsForSegment(i)" :key="wi" class="text-xs text-amber-400">&#9888; {{ w.message }}</p>
             </li>
           </ul>
           <div class="flex gap-4 text-sm">
