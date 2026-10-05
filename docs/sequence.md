@@ -26,7 +26,7 @@ Semua respons API berformat JSON: `{"data": ...}` saat berhasil, `{"error": {"co
 | PUT | `/api/projects/:id/highlight/draft` | Ubah hasil draft (`tim_a`, `tim_b`), validasi ulang, tulis ulang file |
 | GET | `/api/projects/:id/narasi` | Unduh `narasi.txt` |
 | POST | `/api/projects/:id/open-folder` | Buka folder project di file manager |
-| POST | `/api/projects/:id/export` | Salin video, highlight.json, narasi.txt ke folder Premiere (job `export`) |
+| POST | `/api/projects/:id/export` | Salin video, highlight.json, narasi.txt ke folder Premiere dengan nama `<nama project>.*` (job `export`) |
 | GET | `/api/game-modes` | Daftar mode game |
 | GET, PUT | `/api/prompt-blocks/:code` | Baca dan ubah blok prompt |
 | POST | `/api/prompt-blocks/:code/reset` | Kembalikan blok prompt ke bawaan |
@@ -189,13 +189,13 @@ sequenceDiagram
     end
     API->>DB: UPDATE settings export_dir = destDir
     API->>DB: INSERT jobs (export, queued, payload = target_dir)
-    API-->>FE: 200 {job_id, target_dir}
+    API-->>FE: 200 {job_id, target_dir, files {video, highlight, narasi}}
     FE->>API: GET /api/projects/:id/events (SSE, sudah berlangganan)
 
     W->>DB: Ambil job export, job running
     loop Selama menyalin
         W->>FS: Baca source.mp4, highlight.json, narasi.txt
-        W->>DEST: Tulis ke *.smeditor-tmp, lalu rename
+        W->>DEST: Tulis <nama>.mp4, <nama>.highlight.json (field video diganti), <nama>.narasi.txt ke *.smeditor-tmp, lalu rename
         W-->>FE: SSE progress
     end
     alt Dibatalkan atau gagal
@@ -203,7 +203,7 @@ sequenceDiagram
         W-->>FE: SSE canceled/failed
     else Selesai
         W-->>FE: SSE done
-        FE-->>U: Tampilkan target_dir dengan tombol salin
+        FE-->>U: Tampilkan target_dir dengan tombol salin dan nama ketiga file
     end
     Note over W,DB: Job export tidak mengubah status project.
 ```

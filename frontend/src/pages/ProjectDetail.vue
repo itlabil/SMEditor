@@ -30,7 +30,10 @@ const folderPath = ref('')
 const exportDestDir = ref('')
 const exporting = ref(false)
 const exportResultPath = ref('')
+// File names written inside the target folder, named after the project (SM-17).
+const exportResultFiles = ref([])
 let pendingExportTarget = ''
+let pendingExportFiles = []
 
 const highlightBody = ref('')
 const highlightErrors = ref([])
@@ -287,7 +290,9 @@ async function startExport(overwrite = false) {
   try {
     const res = await exportToFolder(route.params.id, exportDestDir.value, overwrite)
     pendingExportTarget = res.target_dir
+    pendingExportFiles = res.files ? [res.files.video, res.files.highlight, res.files.narasi] : []
     exportResultPath.value = ''
+    exportResultFiles.value = []
     success('Menyalin ke folder dimulai')
   } catch (err) {
     if (err.code === 'export_dir_exists') {
@@ -418,6 +423,7 @@ function onJobEvent(ev) {
   if (ev.job_type === 'export') {
     if (ev.type === 'done') {
       exportResultPath.value = pendingExportTarget
+      exportResultFiles.value = pendingExportFiles
       success('Selesai disalin ke folder')
     } else if (ev.type === 'failed') {
       error(ev.message || 'Salin ke folder gagal')
@@ -789,6 +795,9 @@ onUnmounted(() => sse.close())
           <code class="flex-1 overflow-x-auto whitespace-nowrap text-slate-300">{{ exportResultPath }}</code>
           <button class="shrink-0 rounded bg-slate-800 px-2 py-1 font-medium" @click="copyText(exportResultPath)">Salin</button>
         </div>
+        <ul v-if="exportResultPath && exportResultFiles.length" class="flex flex-col gap-1 text-xs text-slate-300">
+          <li v-for="f in exportResultFiles" :key="f" class="font-mono">&#10003; {{ f }}</li>
+        </ul>
       </section>
     </template>
   </AppLayout>

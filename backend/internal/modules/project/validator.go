@@ -1,6 +1,9 @@
 package project
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -62,6 +65,78 @@ func SanitizeFolderName(name string) string {
 		return "project"
 	}
 	return cleaned
+}
+
+// ExportFileNamesFor names the exported files after the project, using
+// the same SanitizeFolderName as the subfolder (SM-17): "<nama><ext>"
+// with the original video's extension, "<nama>.highlight.json", and
+// "<nama>.narasi.txt".
+func ExportFileNamesFor(projectName, videoFile string) ExportFiles {
+	base := SanitizeFolderName(projectName)
+	ext := filepath.Ext(videoFile)
+	if ext == "" {
+		ext = ".mp4"
+	}
+	return ExportFiles{
+		Video:     base + ext,
+		Highlight: base + ".highlight.json",
+		Narasi:    base + ".narasi.txt",
+	}
+}
+
+// RewriteHighlightVideo returns highlight.json content with its top-level
+// "video" field set to video (appended if missing), keeping every other
+// field and their order intact, so the exported copy points at the
+// renamed video file.
+func RewriteHighlightVideo(data []byte, video string) ([]byte, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return nil, fmt.Errorf("highlight.json bukan objek JSON")
+	}
+
+	videoJSON, err := json.Marshal(video)
+	if err != nil {
+		return nil, err
+	}
+
+	var out bytes.Buffer
+	out.WriteByte('{')
+	replaced := false
+	for i := 0; dec.More(); i++ {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, fmt.Errorf("baca highlight.json: %w", err)
+		}
+		key, _ := tok.(string)
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return nil, fmt.Errorf("baca highlight.json: %w", err)
+		}
+		if key == "video" {
+			value, replaced = videoJSON, true
+		}
+		if i > 0 {
+			out.WriteByte(',')
+		}
+		keyJSON, _ := json.Marshal(key)
+		out.Write(keyJSON)
+		out.WriteByte(':')
+		out.Write(value)
+	}
+	if !replaced {
+		if out.Len() > 1 {
+			out.WriteByte(',')
+		}
+		out.WriteString(`"video":`)
+		out.Write(videoJSON)
+	}
+	out.WriteByte('}')
+
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, out.Bytes(), "", "  "); err != nil {
+		return nil, fmt.Errorf("susun highlight.json: %w", err)
+	}
+	return pretty.Bytes(), nil
 }
 
 // ValidExportDest reports whether raw is well-formed enough to use as the

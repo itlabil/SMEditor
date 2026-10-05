@@ -161,7 +161,7 @@ func (s *Service) ExportToFolder(ctx context.Context, id string, req ExportReque
 	if err != nil {
 		return nil, err
 	}
-	return &ExportResult{JobID: j.ID, TargetDir: targetDir}, nil
+	return &ExportResult{JobID: j.ID, TargetDir: targetDir, Files: ExportFileNamesFor(p.Name, p.VideoFile)}, nil
 }
 
 // isDirWritable reports whether dir can actually be written to, by

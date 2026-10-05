@@ -133,8 +133,9 @@ Tersedia begitu status project `siap_premiere`; tujuannya supaya project di app 
 2. App memeriksa folder tujuan ada dan bisa ditulis, lalu menghitung subfolder bernama project (dibersihkan dari karakter yang tidak sah di Windows dan Linux).
 3. Jika subfolder itu sudah ada, app meminta konfirmasi sebelum menimpa.
 4. App menyimpan folder tujuan yang diketik sebagai setting `export_dir` baru, lalu mengantrekan job `export`.
-5. Job menyalin `source.mp4`, `highlight.json`, dan `narasi.txt` ke subfolder itu, dengan progres dan bisa dibatalkan. Job ini tidak mengubah status project.
-6. Setelah selesai, app menampilkan path folder hasil salinan dengan tombol salin.
+5. Job menyalin `source.mp4`, `highlight.json`, dan `narasi.txt` ke subfolder itu dengan nama dari nama project yang sudah dibersihkan: `<nama>.mp4` (ekstensi mengikuti video asli), `<nama>.highlight.json`, `<nama>.narasi.txt`. Field `video` di `<nama>.highlight.json` diganti menjadi `<nama>.mp4`. Penyalinan berjalan dengan progres dan bisa dibatalkan. Job ini tidak mengubah status project, dan nama file di `data/projects/<id>/` tetap.
+6. Setelah selesai, app menampilkan path folder hasil salinan dengan tombol salin, beserta nama ketiga file.
+7. Plugin Premiere membaca `<nama>.highlight.json` dan menulis subtitle `<nama>.srt` di folder yang sama. File lama bernama `highlight.json` tetap bisa dibaca; subtitle-nya memakai nama folder.
 
 ### 4.6 Plugin Premiere
 

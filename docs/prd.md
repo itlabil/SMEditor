@@ -92,14 +92,16 @@ Status project di app web: `baru`, `mengunduh`, `transcript`, `menunggu highligh
 
 - Tombol hanya aktif saat status `siap_premiere`.
 - Pengguna mengisi path folder tujuan lewat input teks; nilai terakhir disimpan sebagai setting `export_dir` dan menjadi isian default berikutnya.
-- App membuat subfolder bernama project (dibersihkan dari karakter yang tidak sah di Windows dan Linux) di dalam tujuan, lalu menyalin `source.mp4`, `highlight.json`, dan `narasi.txt` ke sana. Field `video` di `highlight.json` hasil salinan tetap sama dengan nama file video yang disalin, karena keduanya disalin apa adanya tanpa diubah.
+- App membuat subfolder bernama project (dibersihkan dari karakter yang tidak sah di Windows dan Linux) di dalam tujuan, lalu menyalin video, `highlight.json`, dan `narasi.txt` ke sana dengan nama dari nama project yang sudah dibersihkan (fungsi yang sama dengan nama subfolder): `<nama>.mp4` (ekstensi mengikuti video asli), `<nama>.highlight.json`, dan `<nama>.narasi.txt`. Dengan begitu beberapa game bisa masuk satu project Premiere tanpa nama file kembar. Field `video` di `<nama>.highlight.json` diganti menjadi nama file video yang baru; field lain tidak berubah. Nama file di dalam `data/projects/<id>/` tidak berubah.
+- Jika dua project punya nama bersih yang sama, subfolder tujuannya sama, sehingga konfirmasi timpa di bawah berlaku.
+- Setelah selesai, halaman menampilkan path folder hasil dan nama ketiga file.
 - Penyalinan berjalan sebagai job `export` lewat worker, dengan progres dan bisa dibatalkan; job ini tidak mengubah status project.
 - Jika subfolder tujuan sudah ada, pengguna diminta konfirmasi sebelum menimpa. Jika folder tujuan tidak ada atau tidak bisa ditulis, app menolak dengan pesan yang jelas sebelum membuat job apa pun.
 - Tujuannya: setelah disalin, project di app boleh dihapus tanpa membuat media offline di project Premiere.
 
 ### Plugin Premiere
 
-- Panel berisi: pilih video asli, pilih `highlight.json`, nama sequence, tambahan waktu, dan jeda antar potongan.
+- Panel berisi: pilih video asli, pilih file highlight (`<nama>.highlight.json` hasil "Salin ke folder", atau `highlight.json` lama), nama sequence, tambahan waktu, dan jeda antar potongan.
 - Tambahan waktu memperpanjang tiap potongan di awal dan akhir, default 1 detik, sebagai ruang untuk transisi dan koreksi jika potongan AI kurang pas.
 - Jeda antar potongan di timeline, default 1 detik.
 - Plugin mengimpor video ke project jika belum ada, lalu membuat sequence dengan resolusi dan fps yang sama dengan video.

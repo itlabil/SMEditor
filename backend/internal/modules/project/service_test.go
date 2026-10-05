@@ -738,6 +738,12 @@ func TestServiceExportToFolder_Success(t *testing.T) {
 	if sw.lastValues[settings.KeyExportDir] != destDir {
 		t.Errorf("settings export_dir = %q, want %q", sw.lastValues[settings.KeyExportDir], destDir)
 	}
+	if want := ExportFileNamesFor(p.Name, p.VideoFile); result.Files != want {
+		t.Errorf("Files = %+v, want %+v", result.Files, want)
+	}
+	if result.Files.Highlight != SanitizeFolderName(p.Name)+".highlight.json" {
+		t.Errorf("Files.Highlight = %q, want it named after the project", result.Files.Highlight)
+	}
 }
 
 func TestServiceVideoPath_MissingReturnsNotFound(t *testing.T) {

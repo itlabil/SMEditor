@@ -22,11 +22,28 @@ const exportTempSuffix = ".smeditor-tmp"
 // copying a multi-GB video slow.
 const exportCopyBufSize = 1 << 20 // 1 MiB
 
-// exportFiles are the files "Salin ke folder" copies, per docs/prd.md.
-// highlight.json and narasi.txt are copied byte-for-byte, so
-// highlight.json's "video" field (already storage.SourceVideoFile)
-// keeps matching the copied video's file name without any rewriting.
-var exportFiles = []string{storage.SourceVideoFile, storage.HighlightFile, storage.NarrationFile}
+// exportFile is one file "Salin ke folder" copies: src is its fixed
+// name inside data/projects/<id>/, dst its project-named name in the
+// target folder (SM-17).
+type exportFile struct {
+	src, dst string
+	// rewriteVideo marks highlight.json, whose "video" field must name
+	// the renamed video instead of source.mp4.
+	rewriteVideo bool
+}
+
+func exportFilesFor(p *Project) []exportFile {
+	videoFile := p.VideoFile
+	if videoFile == "" {
+		videoFile = storage.SourceVideoFile
+	}
+	names := ExportFileNamesFor(p.Name, videoFile)
+	return []exportFile{
+		{src: videoFile, dst: names.Video},
+		{src: storage.HighlightFile, dst: names.Highlight, rewriteVideo: true},
+		{src: storage.NarrationFile, dst: names.Narasi},
+	}
+}
 
 // ExportRunner implements job.Runner for job.TypeExport: it copies a
 // project's finished output into j.Payload, an absolute folder computed
@@ -45,9 +62,11 @@ func NewExportRunner(repo *Repository, st *storage.Storage) *ExportRunner {
 func (r *ExportRunner) Type() string { return job.TypeExport }
 
 func (r *ExportRunner) Run(ctx context.Context, j job.Job, report job.ProgressFunc) error {
-	if _, err := r.repo.FindByID(ctx, j.ProjectID); err != nil {
+	p, err := r.repo.FindByID(ctx, j.ProjectID)
+	if err != nil {
 		return fmt.Errorf("baca project: %w", err)
 	}
+	files := exportFilesFor(p)
 
 	targetDir := j.Payload
 	if targetDir == "" {
@@ -58,55 +77,73 @@ func (r *ExportRunner) Run(ctx context.Context, j job.Job, report job.ProgressFu
 	}
 
 	var totalSize int64
-	sizes := make(map[string]int64, len(exportFiles))
-	for _, name := range exportFiles {
-		srcPath, err := r.storage.FilePath(j.ProjectID, name)
+	sizes := make(map[string]int64, len(files))
+	for _, f := range files {
+		srcPath, err := r.storage.FilePath(j.ProjectID, f.src)
 		if err != nil {
 			return err
 		}
 		info, err := os.Stat(srcPath)
 		if err != nil {
-			return fmt.Errorf("baca %s: %w", name, err)
+			return fmt.Errorf("baca %s: %w", f.src, err)
 		}
-		sizes[name] = info.Size()
+		sizes[f.src] = info.Size()
 		totalSize += info.Size()
 	}
 
 	// A leftover temp file from an interrupted previous attempt must be
 	// removed before copying starts again.
-	for _, name := range exportFiles {
-		_ = os.Remove(filepath.Join(targetDir, name+exportTempSuffix))
+	for _, f := range files {
+		_ = os.Remove(filepath.Join(targetDir, f.dst+exportTempSuffix))
 	}
 
 	var copiedBefore int64
-	for _, name := range exportFiles {
-		srcPath, err := r.storage.FilePath(j.ProjectID, name)
+	for _, f := range files {
+		srcPath, err := r.storage.FilePath(j.ProjectID, f.src)
 		if err != nil {
 			return err
 		}
-		dstPath := filepath.Join(targetDir, name)
+		dstPath := filepath.Join(targetDir, f.dst)
 		tmpPath := dstPath + exportTempSuffix
 
-		err = copyFileWithProgress(ctx, srcPath, tmpPath, func(copiedThisFile int64) {
-			percent := 100.0
-			if totalSize > 0 {
-				percent = float64(copiedBefore+copiedThisFile) / float64(totalSize) * 100
-			}
-			report(percent, "Menyalin "+name)
-		})
+		if f.rewriteVideo {
+			err = writeHighlightCopy(srcPath, tmpPath, files[0].dst)
+		} else {
+			err = copyFileWithProgress(ctx, srcPath, tmpPath, func(copiedThisFile int64) {
+				percent := 100.0
+				if totalSize > 0 {
+					percent = float64(copiedBefore+copiedThisFile) / float64(totalSize) * 100
+				}
+				report(percent, "Menyalin "+f.dst)
+			})
+		}
 		if err != nil {
 			os.Remove(tmpPath)
-			return fmt.Errorf("salin %s: %w", name, err)
+			return fmt.Errorf("salin %s: %w", f.dst, err)
 		}
 		if err := os.Rename(tmpPath, dstPath); err != nil {
 			os.Remove(tmpPath)
-			return fmt.Errorf("timpa %s: %w", name, err)
+			return fmt.Errorf("timpa %s: %w", f.dst, err)
 		}
-		copiedBefore += sizes[name]
+		copiedBefore += sizes[f.src]
 	}
 
 	report(100, "Selesai")
 	return nil
+}
+
+// writeHighlightCopy writes highlight.json to dstPath with its "video"
+// field set to video, the renamed video file next to it.
+func writeHighlightCopy(srcPath, dstPath, video string) error {
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return err
+	}
+	rewritten, err := RewriteHighlightVideo(data, video)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dstPath, rewritten, 0o644)
 }
 
 // copyFileWithProgress copies srcPath to dstPath (overwriting dstPath if

@@ -13,6 +13,22 @@ premiere-plugin/
   host/index.jsx        skrip host (ExtendScript) yang berbicara dengan Premiere
 ```
 
+## File yang dibaca dan ditulis
+
+Tombol **Salin ke folder** di app web (SM-17) menaruh tiga file bernama project di satu subfolder, supaya beberapa game bisa masuk satu project Premiere tanpa nama file kembar:
+
+```
+<folder tujuan>\<nama project>\
+  <nama project>.mp4              video asli (ekstensi mengikuti video asli)
+  <nama project>.highlight.json   dibaca plugin; field "video" = "<nama project>.mp4"
+  <nama project>.narasi.txt       script narasi untuk dubbing
+```
+
+- Plugin membaca `<nama>.highlight.json` dan mencari videonya lewat field `video`, di folder yang sama.
+- Subtitle dari narasi ditulis sebagai `<nama>.srt` di folder yang sama, dan nama sequence bawaan menjadi `Highlight - <nama>`.
+- File lama bernama `highlight.json` (hasil export sebelum SM-17, atau disalin manual dari `data\projects\<id>\`) tetap didukung. Untuk file seperti ini, `<nama>` diambil dari nama foldernya, jadi subtitle-nya menjadi `<nama folder>.srt`.
+- Field tambahan seperti `draft` (SM-16) diabaikan; plugin hanya memakai `segmen`, `video`, dan `durasi`.
+
 ## Pasang (sekali saja)
 
 Jalankan di PowerShell. Sesuaikan path jika repo tidak berada di `Documents\SMEditor`.

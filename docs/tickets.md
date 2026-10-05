@@ -30,6 +30,7 @@ Kerjakan berurutan, satu tiket per sesi. Sebuah tiket selesai jika semua kriteri
 | SM-14 | Salin ke folder | SM-09 |
 | SM-15 | Ubah dan hapus segmen highlight | SM-09 |
 | SM-16 | Hasil draft untuk genre MOBA | SM-08, SM-15 |
+| SM-17 | Nama file hasil Salin ke folder mengikuti nama project | SM-14 |
 
 ---
 
@@ -193,3 +194,16 @@ Kriteria terima:
 - `narasi.txt` memuat hasil draft di bagian atas.
 - Field `draft` tidak membuat plugin Premiere gagal membaca file (plugin hanya membaca `segmen`).
 - Unit test untuk validasi `draft`, narasi dengan draft, ubah draft, dan migrasi yang tidak menimpa blok buatan pengguna.
+
+## SM-17 — Nama file hasil "Salin ke folder" mengikuti nama project
+
+Supaya beberapa game bisa masuk satu project Premiere tanpa nama file kembar.
+
+Kriteria terima:
+- Saat export, file di subfolder tujuan diberi nama dari nama project yang sudah dibersihkan (fungsi sanitasi yang sama dengan nama subfolder): `<nama>.mp4` (ekstensi mengikuti video asli), `<nama>.highlight.json`, `<nama>.narasi.txt`.
+- Field `video` di file highlight hasil salinan berisi nama file video yang baru; field lain dan urutannya tidak berubah.
+- Penamaan di dalam `data/projects/<id>/` tidak berubah.
+- Jika dua project punya nama bersih yang sama, konfirmasi timpa yang sudah ada tetap berlaku.
+- Halaman project menampilkan nama ketiga file hasil setelah export selesai (respons `POST /api/projects/:id/export` mendapat `files`).
+- `premiere-plugin/README.md`: plugin membaca `<nama>.highlight.json` dan menulis `<nama>.srt`; file lama bernama `highlight.json` tetap didukung.
+- Unit test: nama file hasil, field `video`, dan nama project dengan karakter yang tidak sah di Windows.

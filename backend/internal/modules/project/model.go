@@ -61,6 +61,17 @@ type ExportRequest struct {
 // folder (DestDir plus the project's sanitized name) the copy will land
 // in, so the UI can show it once the job finishes.
 type ExportResult struct {
-	JobID     string `json:"job_id"`
-	TargetDir string `json:"target_dir"`
+	JobID     string      `json:"job_id"`
+	TargetDir string      `json:"target_dir"`
+	Files     ExportFiles `json:"files"`
+}
+
+// ExportFiles are the file names "Salin ke folder" writes inside
+// TargetDir (SM-17): named after the project so several games can sit in
+// one Premiere project folder without clashing. Files inside
+// data/projects/<id>/ keep their fixed names.
+type ExportFiles struct {
+	Video     string `json:"video"`
+	Highlight string `json:"highlight"`
+	Narasi    string `json:"narasi"`
 }
