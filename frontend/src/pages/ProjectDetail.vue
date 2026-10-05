@@ -8,7 +8,7 @@ import { cancelJob } from '../api/jobs'
 import { useNotify } from '../composables/useNotify'
 import { useConfirm } from '../composables/useConfirm'
 import { useSSE } from '../composables/useSSE'
-import { statusLabel, gameName, jobTypeLabel } from '../lib/labels'
+import { statusLabel, gameName, jobTypeLabel, categoryColor } from '../lib/labels'
 import AppLayout from '../components/AppLayout.vue'
 
 const route = useRoute()
@@ -136,6 +136,10 @@ function formatHMS(totalSec) {
 function parseHMS(s) {
   const [h, m, sec] = s.split(':').map(Number)
   return h * 3600 + m * 60 + sec
+}
+
+function segmentDurationSec(s) {
+  return Math.round(parseHMS(s.selesai) - parseHMS(s.mulai))
 }
 
 // Plays the video from segment s's "mulai" and stops it at "selesai" —
@@ -370,7 +374,8 @@ onUnmounted(() => sse.close())
             >
               <p class="font-medium">
                 {{ i + 1 }}. [{{ s.mulai }} - {{ s.selesai }}] {{ s.label }}
-                <span class="text-xs text-slate-500">({{ s.kategori }})</span>
+                <span class="rounded px-1.5 py-0.5 text-xs" :class="categoryColor(s.kategori)">{{ s.kategori }}</span>
+                <span class="text-xs text-slate-500">· {{ segmentDurationSec(s) }} detik</span>
                 <span v-if="i === activeSegmentIndex" class="text-xs text-emerald-400">&#9654; sedang diputar</span>
               </p>
               <p class="text-xs text-slate-400">{{ s.narasi }}</p>
