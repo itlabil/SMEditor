@@ -8,6 +8,7 @@
 /backend/bin/
 /backend/tmp/
 *.exe
+smeditor.exe.old
 *.test
 *.out
 
